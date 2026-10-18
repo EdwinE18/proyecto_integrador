@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMS · Base de datos</title>
+<style>
+  :root {
+    --fondo: #f6f4ef; --panel: #ffffff; --tinta: #1f2a2e; --suave: #5f6b70;
+    --linea: #e3dfd6; --acento: #1d6b5f; --acento-suave: #e3f1ee;
+    --pk: #b7791f; --fk: #2b6cb0; --malo: #b83232;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--fondo); color: var(--tinta); font-size: 14px; }
+  header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+           padding: 18px 24px; border-bottom: 1px solid var(--linea); background: var(--panel); }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: -.01em; }
+  header .sub { color: var(--suave); }
+  header .stats { margin-left: auto; display: flex; gap: 20px; color: var(--suave); }
+  header .stats b { color: var(--tinta); font-size: 16px; }
+  .app { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 62px); }
+  nav { border-right: 1px solid var(--linea); padding: 12px; background: var(--panel); }
+  nav .titulo { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); margin: 6px 8px 10px; }
+  nav button { display: flex; justify-content: space-between; width: 100%; text-align: left;
+               border: 0; background: none; padding: 8px 10px; border-radius: 6px; cursor: pointer;
+               font: inherit; color: var(--tinta); }
+  nav button:hover { background: var(--fondo); }
+  nav button.activa { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
+  nav button span { color: var(--suave); font-variant-numeric: tabular-nums; font-weight: 400; }
+  main { padding: 20px 24px; min-width: 0; }
+  main h2 { margin: 0 0 4px; font-size: 22px; font-family: var(--mono); }
+  main .meta { color: var(--suave); margin-bottom: 16px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--linea); margin-bottom: 16px; }
+  .tabs button { border: 0; background: none; padding: 10px 14px; font: inherit; cursor: pointer;
+                 color: var(--suave); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button.activa { color: var(--acento); border-color: var(--acento); font-weight: 600; }
+  .caja { background: var(--panel); border: 1px solid var(--linea); border-radius: 8px; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 8px 12px; border-bottom: 1px solid var(--linea); text-align: left; vertical-align: top; white-space: nowrap; }
+  th { position: sticky; top: 0; background: #faf9f6; font-size: 12px; color: var(--suave); font-weight: 600; }
+  td.mono, .mono { font-family: var(--mono); font-size: 12.5px; }
+  td.nulo { color: #aaa; font-style: italic; }
+  td.largo { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+  tr:last-child td { border-bottom: 0; }
+  .chip { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-right: 4px; }
+  .chip.pk { background: #fdf3e1; color: var(--pk); }
+  .chip.fk { background: #e6eff9; color: var(--fk); }
+  .chip.x  { background: #fbe9e9; color: var(--malo); }
+  .chip.c  { background: #eef0f1; color: var(--suave); }
+  .seccion { margin: 22px 0 8px; font-weight: 600; }
+  .paginar { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--suave); }
+  .paginar button { border: 1px solid var(--linea); background: var(--panel); border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  .paginar button:disabled { opacity: .4; cursor: default; }
+  .vacio { padding: 30px; text-align: center; color: var(--suave); }
+  .error { padding: 16px; color: var(--malo); }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; } nav { border-right: 0; border-bottom: 1px solid var(--linea); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏨 PMS Hoteles Boutique y Posadas</h1>
+  <span class="sub">Base de datos <span class="mono">hotel_pms</span> · PostgreSQL leída desde Node.js</span>
+  <div class="stats" id="stats"></div>
+</header>
+<div class="app">
+  <nav><div class="titulo">Tablas</div><div id="lista">Cargando…</div></nav>
+  <main id="principal"><div class="vacio">Elige una tabla a la izquierda.</div></main>
+</div>
+
+<script>
+const API = '/api/explorador';
+let estado = { tabla: null, pestana: 'datos', desplazamiento: 0, limite: 25 };
+
+const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function formatear(valor) {
+  if (valor === null) return { html: 'NULL', clase: 'nulo' };
+  if (typeof valor === 'object') return { html: esc(JSON.stringify(valor)), clase: 'mono largo' };
+  if (typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(valor)) {
+    const d = new Date(valor);
+    return { html: esc(d.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })), clase: '' };
+  }
+  if (typeof valor === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(valor))
+    return { html: `<span title="${esc(valor)}">${esc(valor.slice(0, 8))}…</span>`, clase: 'mono' };
+  if (typeof valor === 'string' && valor.startsWith('$2')) return { html: '••••••••', clase: 'mono' }; // contraseñas
+  return { html: esc(valor), clase: typeof valor === 'number' ? 'mono' : 'largo' };
+}
+
+async function cargarTablas() {
+  const tablas = await (await fetch(`${API}/tablas`)).json();
+  const totalFilas = tablas.reduce((s, t) => s + t.filas, 0);
+  document.getElementById('stats').innerHTML =
+    `<span><b>${tablas.length}</b> tablas</span><span><b>${totalFilas}</b> registros</span>`;
+  document.getElementById('lista').innerHTML = tablas.map((t) =>
+    `<button data-t="${esc(t.nombre)}">${esc(t.nombre)} <span>${t.filas}</span></button>`).join('');
+  document.querySelectorAll('nav button').forEach((b) =>
+    b.onclick = () => { estado = { ...estado, tabla: b.dataset.t, desplazamiento: 0 }; mostrar(); });
+  if (tablas.length) { estado.tabla = 'reservaciones'; mostrar(); }
+}
+
+async function mostrar() {
+  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('activa', b.dataset.t === estado.tabla));
+  const p = document.getElementById('principal');
+  const r = await fetch(`${API}/tablas/${encodeURIComponent(estado.tabla)}?limite=${estado.limite}&desplazamiento=${estado.desplazamiento}`);
+  const t = await r.json();
+  if (!r.ok) { p.innerHTML = `<div class="error">${esc(t.error)}</div>`; return; }
+
+  const pest = (id, txt) => `<button class="${estado.pestana === id ? 'activa' : ''}" data-p="${id}">${txt}</button>`;
+  p.innerHTML = `
+    <h2>${esc(t.nombre)}</h2>
+    <div class="meta">${t.columnas.length} columnas · ${t.total} registros · ${t.relaciones.length} relaciones</div>
+    <div class="tabs">${pest('datos', 'Datos')}${pest('estructura', 'Estructura')}${pest('relaciones', 'Relaciones y reglas')}</div>
+    <div id="contenido"></div>`;
+  p.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => { estado.pestana = b.dataset.p; mostrar(); });
+  const c = document.getElementById('contenido');
+  if (estado.pestana === 'datos') c.innerHTML = vistaDatos(t);
+  if (estado.pestana === 'estructura') c.innerHTML = vistaEstructura(t);
+  if (estado.pestana === 'relaciones') c.innerHTML = vistaRelaciones(t);
+  c.querySelectorAll('[data-mover]').forEach((b) => b.onclick = () => {
+    estado.desplazamiento = Math.max(0, estado.desplazamiento + Number(b.dataset.mover) * estado.limite); mostrar();
+  });
+}
+
+function vistaDatos(t) {
+  if (!t.filas.length) return '<div class="caja vacio">Esta tabla aún no tiene registros.</div>';
+  const cols = t.columnas.map((c) => c.nombre);
+  const filas = t.filas.map((f) => '<tr>' + cols.map((k) => {
+    const v = formatear(f[k]); return `<td class="${v.clase}">${v.html}</td>`;
+  }).join('') + '</tr>').join('');
+  const fin = Math.min(t.desplazamiento + t.limite, t.total);
+  return `<div class="caja"><table><thead><tr>${cols.map((k) => `<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table></div>
+    <div class="paginar"><button data-mover="-1" ${t.desplazamiento === 0 ? 'disabled' : ''}>← Anterior</button>
+    <button data-mover="1" ${fin >= t.total ? 'disabled' : ''}>Siguiente →</button>
+    <span>${t.desplazamiento + 1}–${fin} de ${t.total}</span></div>`;
+}
+
+function vistaEstructura(t) {
+  const filas = t.columnas.map((c) => `<tr>
+    <td class="mono"><b>${esc(c.nombre)}</b></td>
+    <td class="mono">${esc(c.tipo)}</td>
+    <td>${c.pk ? '<span class="chip pk">PK</span>' : ''}${c.fk ? `<span class="chip fk">FK → ${esc(c.fk)}</span>` : ''}</td>
+    <td>${c.nulo ? 'Sí' : 'No'}</td>
+    <td class="mono largo">${c.defecto ? esc(c.defecto) : ''}</td></tr>`).join('');
+  return `<div class="caja"><table><thead><tr><th>Columna</th><th>Tipo</th><th>Llave</th><th>¿Acepta nulo?</th><th>Valor por defecto</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+}
+
+function vistaRelaciones(t) {
+  const rel = t.relaciones.length ? t.relaciones.map((r) => `<tr>
+      <td class="mono">${esc(r.tabla_origen)}.${esc(r.columna_origen)}</td><td>→</td>
+      <td class="mono">${esc(r.tabla_destino)}.${esc(r.columna_destino)}</td>
+      <td>${r.tabla_origen === t.nombre ? 'Esta tabla apunta a otra' : 'Otra tabla apunta a esta'}</td></tr>`).join('')
+    : '<tr><td class="vacio" colspan="4">Sin relaciones</td></tr>';
+  const clase = { EXCLUDE: 'x', UNIQUE: 'pk', CHECK: 'c' };
+  const reglas = t.reglas.length ? t.reglas.map((r) => `<tr>
+      <td><span class="chip ${clase[r.tipo]}">${r.tipo}</span></td><td class="mono">${esc(r.nombre)}</td>
+      <td class="mono" style="white-space:normal">${esc(r.definicion)}</td></tr>`).join('')
+    : '<tr><td class="vacio" colspan="3">Sin reglas adicionales</td></tr>';
+  return `<div class="seccion" style="margin-top:0">Llaves foráneas</div>
+    <div class="caja"><table><thead><tr><th>Origen</th><th></th><th>Destino</th><th></th></tr></thead><tbody>${rel}</tbody></table></div>
+    <div class="seccion">Reglas de validación</div>
+    <div class="caja"><table><thead><tr><th>Tipo</th><th>Nombre</th><th>Definición</th></tr></thead><tbody>${reglas}</tbody></table></div>`;
+}
+
+cargarTablas().catch((e) => {
+  document.getElementById('lista').innerHTML = `<div class="error">No se pudo conectar con el backend: ${esc(e.message)}</div>`;
+});
+</script>
+</body>
+</html>
