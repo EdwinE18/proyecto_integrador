@@ -37,7 +37,7 @@ export const habitacionRoutes = ({ cambiarEstadoHabitacion }) => {
   // body: { estado: 'disponible' | 'limpieza' | 'mantenimiento' | 'fuera_servicio', comentario? }
   router.patch('/:id/estado', validarUUID('id', 'La habitación no existe'), async (req, res, next) => {
     try {
-      const { habitacion, reservacionesAfectadas } = await cambiarEstadoHabitacion.ejecutar(req.params.id, req.body);
+      const { habitacion, reservacionesAfectadas } = await cambiarEstadoHabitacion.ejecutar(req.params.id, req.body, req.usuario);
       res.json({ habitacion: aHabitacionJSON(habitacion), reservacionesAfectadas });
     } catch (e) { next(e); }
   });

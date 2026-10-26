@@ -75,6 +75,8 @@ export class PostgresEsquemaRepository extends EsquemaRepository {
     const t = `public.${comillas(nombre)}`;
     const total = (await this.pool.query(`SELECT count(*)::int AS n FROM ${t}`)).rows[0].n;
     const { rows } = await this.pool.query(`SELECT * FROM ${t} LIMIT $1 OFFSET $2`, [limite, desplazamiento]);
+    // Los hashes de contraseña NUNCA salen de la base de datos (antes solo se ocultaban en pantalla)
+    for (const f of rows) if ('password_hash' in f) f.password_hash = '••••••••';
     return { total, filas: rows };
   }
 }

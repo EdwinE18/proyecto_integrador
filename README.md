@@ -73,7 +73,7 @@ hotel-pms/
 │   │   │   ├── habitaciones/              # ✅ Habitacion (estados RN-24), disponibilidad con precio
 │   │   │   ├── hoteles/                   # ✅ Lista de hoteles con ocupación del día
 │   │   │   ├── explorador/                # ✅ Página para ver la BD
-│   │   │   └── usuarios/                  # ⬜ Login y roles (siguiente)
+│   │   │   └── usuarios/                  # ✅ Login (JWT + bcrypt), permisos por rol, bloqueo de intentos
 │   │   ├── shared/
 │   │   │   ├── container.js               # inyección de dependencias
 │   │   │   └── infrastructure/            # pool BD, config, outbox, middlewares
@@ -96,6 +96,39 @@ hotel-pms/
 ```
 
 Para crear un módulo nuevo copia el patrón de `reservaciones`: entidad → puerto → caso de uso → adaptador Postgres → rutas → registrarlo en `container.js`.
+
+---
+
+## Inicio de sesión
+
+Toda la API pide sesión (excepto el login). Usuarios de prueba (contraseña `Demo1234`):
+
+| Correo | Rol | Hotel |
+|---|---|---|
+| `admin@pms.local` | admin general | todos |
+| `recepcion@losarcos.mx` | recepción | Posada Los Arcos |
+| `limpieza@losarcos.mx` | limpieza | Posada Los Arcos |
+| `gerente@boutiquecanon.mx` | gerente | Hotel Boutique Cañón |
+
+```bash
+# 1. Iniciar sesión y guardar el token
+TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"recepcion@losarcos.mx","password":"Demo1234"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+
+# 2. Mandarlo en cada petición
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/hoteles
+```
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `POST` | `/api/auth/login` | `{ "email", "password" }` → `{ token, expiraEn, usuario: { rol, permisos, ... } }` |
+| `GET` | `/api/auth/yo` | Usuario de la sesión actual |
+| `POST` | `/api/auth/password` | Cambiar mi contraseña: `{ "actual", "nueva" }` |
+| `GET` / `POST` | `/api/usuarios` | Listar / crear usuarios (solo admin) |
+
+Respuestas de seguridad: **401** sin sesión o sesión vencida (RN-71) · **403** sin permiso para esa acción (RN-72) o de otro hotel (RN-75) · **429** demasiados intentos (RN-74).
+
+> ⚠️ Antes de subir a AWS cambia `JWT_SECRET` en `backend/.env` por uno propio: `openssl rand -hex 32`
 
 ---
 
@@ -126,7 +159,7 @@ Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuest
 
 Ejemplo:
 ```bash
-curl -X POST http://localhost:3000/api/reservaciones -H 'Content-Type: application/json' -d '{
+curl -X POST http://localhost:3000/api/reservaciones -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{
   "hotelId": "11111111-1111-1111-1111-111111111111",
   "huespedId": "b0000000-0000-0000-0000-000000000001",
   "habitacionId": "<id de una habitación>",

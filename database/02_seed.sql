@@ -11,7 +11,8 @@ INSERT INTO hoteles (id, nombre, tipo, ciudad, telefono, email) VALUES
 INSERT INTO usuarios (hotel_id, nombre, apellidos, email, password_hash, rol) VALUES
   (NULL, 'Admin', 'Sistema', 'admin@pms.local', crypt('Demo1234', gen_salt('bf', 10)), 'admin'),
   ('11111111-1111-1111-1111-111111111111', 'María', 'López Pérez', 'recepcion@losarcos.mx', crypt('Demo1234', gen_salt('bf', 10)), 'recepcion'),
-  ('22222222-2222-2222-2222-222222222222', 'Jorge', 'Ruiz Gómez',  'gerente@boutiquecanon.mx', crypt('Demo1234', gen_salt('bf', 10)), 'gerente');
+  ('22222222-2222-2222-2222-222222222222', 'Jorge', 'Ruiz Gómez',  'gerente@boutiquecanon.mx', crypt('Demo1234', gen_salt('bf', 10)), 'gerente'),
+  ('11111111-1111-1111-1111-111111111111', 'Rosa',  'Hernández Cruz', 'limpieza@losarcos.mx', crypt('Demo1234', gen_salt('bf', 10)), 'limpieza');
 
 INSERT INTO tipos_habitacion (id, hotel_id, nombre, capacidad_adultos, capacidad_ninos, precio_base, amenidades) VALUES
   ('a0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Sencilla',       1, 0,  650, '["wifi","agua caliente"]'),

@@ -2,6 +2,7 @@
 import { pool } from './infrastructure/database/pool.js';
 import { PostgresOutboxPublisher } from './infrastructure/events/PostgresOutboxPublisher.js';
 import { RelojSistema } from './infrastructure/time/RelojSistema.js';
+import { config } from './infrastructure/config/env.js';
 
 // Reservaciones
 import { PostgresReservacionRepository } from '../modules/reservaciones/infrastructure/persistence/PostgresReservacionRepository.js';
@@ -38,6 +39,18 @@ import { ListarHabitaciones } from '../modules/habitaciones/application/use-case
 import { BuscarDisponibilidad } from '../modules/habitaciones/application/use-cases/BuscarDisponibilidad.js';
 import { CambiarEstadoHabitacion } from '../modules/habitaciones/application/use-cases/CambiarEstadoHabitacion.js';
 
+// Usuarios y seguridad
+import { PostgresUsuarioRepository } from '../modules/usuarios/infrastructure/persistence/PostgresUsuarioRepository.js';
+import { PostgresHotelDeRecurso } from '../modules/usuarios/infrastructure/persistence/PostgresHotelDeRecurso.js';
+import { BcryptPasswordHasher } from '../modules/usuarios/infrastructure/security/BcryptPasswordHasher.js';
+import { JwtTokenService } from '../modules/usuarios/infrastructure/security/JwtTokenService.js';
+import { MemoriaContadorIntentos } from '../modules/usuarios/infrastructure/security/MemoriaContadorIntentos.js';
+import { IniciarSesion } from '../modules/usuarios/application/use-cases/IniciarSesion.js';
+import { ObtenerSesion } from '../modules/usuarios/application/use-cases/ObtenerSesion.js';
+import { CrearUsuario } from '../modules/usuarios/application/use-cases/CrearUsuario.js';
+import { ListarUsuarios } from '../modules/usuarios/application/use-cases/ListarUsuarios.js';
+import { CambiarPassword } from '../modules/usuarios/application/use-cases/CambiarPassword.js';
+
 // Explorador de la BD
 import { PostgresEsquemaRepository } from '../modules/explorador/infrastructure/persistence/PostgresEsquemaRepository.js';
 import { ListarTablas } from '../modules/explorador/application/use-cases/ListarTablas.js';
@@ -55,6 +68,13 @@ const habitacionRepository = new PostgresHabitacionRepository(pool);
 const pagoRepository = new PostgresPagoRepository(pool);
 const estanciaRepository = new PostgresEstanciaRepository(pool);
 const esquemaRepository = new PostgresEsquemaRepository(pool);
+const usuarioRepository = new PostgresUsuarioRepository(pool);
+const passwordHasher = new BcryptPasswordHasher();
+const tokenService = new JwtTokenService(config.jwtSecret, '8h');
+const contadorIntentos = new MemoriaContadorIntentos({ maximo: 5, ventanaMs: 15 * 60_000 });
+
+// Para revisar a qué hotel pertenece una reservación o habitación (RN-75)
+export const hotelDeRecurso = new PostgresHotelDeRecurso(pool);
 
 // Casos de uso (aplicación)
 export const container = {
@@ -79,6 +99,12 @@ export const container = {
   listarHabitaciones: new ListarHabitaciones({ habitacionRepository }),
   buscarDisponibilidad: new BuscarDisponibilidad({ habitacionRepository, tarifaReader, reloj }),
   cambiarEstadoHabitacion: new CambiarEstadoHabitacion({ habitacionRepository, reloj, eventPublisher }),
+
+  iniciarSesion: new IniciarSesion({ usuarioRepository, passwordHasher, tokenService, contadorIntentos }),
+  obtenerSesion: new ObtenerSesion({ usuarioRepository, tokenService }),
+  crearUsuario: new CrearUsuario({ usuarioRepository, passwordHasher }),
+  listarUsuarios: new ListarUsuarios({ usuarioRepository }),
+  cambiarPassword: new CambiarPassword({ usuarioRepository, passwordHasher }),
 
   listarTablas: new ListarTablas({ esquemaRepository }),
   verTabla: new VerTabla({ esquemaRepository }),

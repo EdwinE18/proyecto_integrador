@@ -182,6 +182,18 @@ BEGIN
        VALUES ('a0000000-0000-0000-0000-000000000002', 'Pascua', '2030-03-28', '2030-04-05', 1300)$q$);
 
   RAISE NOTICE '';
+  RAISE NOTICE '==== USUARIOS Y SEGURIDAD ====';
+  -- RN-71 y RN-75 requieren database/08_reglas_usuarios.sql
+  PERFORM pg_temp.debe_fallar('RN-70', 'No se repite el correo de un usuario (sin importar mayúsculas)',
+    $q$INSERT INTO usuarios (nombre, apellidos, email, password_hash, rol) VALUES ('X', 'Y', 'ADMIN@PMS.LOCAL', crypt('Demo1234', gen_salt('bf')), 'admin')$q$);
+  PERFORM pg_temp.debe_fallar('RN-71', 'No se guarda una contraseña en texto plano',
+    $q$INSERT INTO usuarios (nombre, apellidos, email, password_hash, rol) VALUES ('X', 'Y', 'x@y.mx', 'Demo1234', 'admin')$q$);
+  PERFORM pg_temp.debe_pasar('RN-71', 'Sí se guarda un hash bcrypt',
+    $q$INSERT INTO usuarios (nombre, apellidos, email, password_hash, rol) VALUES ('X', 'Y', 'x@y.mx', crypt('Demo1234', gen_salt('bf', 10)), 'admin')$q$);
+  PERFORM pg_temp.debe_fallar('RN-75', 'Un recepcionista debe pertenecer a un hotel',
+    $q$INSERT INTO usuarios (nombre, apellidos, email, password_hash, rol) VALUES ('X', 'Y', 'r@y.mx', crypt('Demo1234', gen_salt('bf', 10)), 'recepcion')$q$);
+
+  RAISE NOTICE '';
   RAISE NOTICE 'Listo. Todos los cambios de prueba se deshacen (ROLLBACK).';
 END $$;
 

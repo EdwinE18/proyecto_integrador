@@ -32,9 +32,9 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Estancias (check-in / check-out) | 7 | 0 | 0 | 0 |
 | Pagos | 6 | 0 | 0 | 1 |
 | Tarifas | 2 | 0 | 0 | 0 |
-| Usuarios y seguridad | 1 | 0 | 2 | 0 |
+| Usuarios y seguridad | 6 | 0 | 0 | 0 |
 | Automatización y notificaciones | 1 | 0 | 2 | 1 |
-| **Total** | **42** | **0** | **4** | **3** |
+| **Total** | **47** | **0** | **2** | **3** |
 
 ---
 
@@ -278,20 +278,49 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ## 7. Usuarios y seguridad
 
 ### RN-70 · El correo de un usuario es único ✅
-- **Dónde se aplica:** BD (`UNIQUE`; además `CITEXT` ignora mayúsculas).
+- **Dónde se aplica:** BD (`UNIQUE`; además `CITEXT` ignora mayúsculas, así que `ADMIN@pms.local` choca con `admin@pms.local`).
 
-### RN-71 · Las contraseñas se guardan cifradas ⬜
-- **Regla:** se guarda solo el hash bcrypt, nunca la contraseña en texto. Los datos de prueba ya cumplen, pero falta el módulo de registro e inicio de sesión.
+### RN-71 · Solo entra quien inicia sesión, y las contraseñas nunca se guardan en texto ✅
+- **Regla:**
+  - Todas las rutas de la API piden sesión, salvo `POST /api/auth/login` y `/api/health`.
+  - Las contraseñas se guardan como hash **bcrypt** (lento a propósito para frenar ataques de fuerza bruta).
+  - Si el login falla, el mensaje siempre es *"Correo o contraseña incorrectos"*: nunca dice cuál de los dos, para no revelar qué correos existen. Aunque el correo no exista, se hace la comparación igual, para que la respuesta tarde lo mismo.
+  - La sesión es un token **JWT** que dura **8 horas** (un turno). Solo lleva el id del usuario: el rol se lee de la BD en cada petición, así que **desactivar a un usuario le quita el acceso al instante**.
+  - Los hashes de contraseña nunca salen del servidor, ni siquiera en el explorador de la BD.
+- **Dónde se aplica:** casos de uso `IniciarSesion` y `ObtenerSesion` + adaptadores `BcryptPasswordHasher` y `JwtTokenService` + BD (restricción `rn71_password_es_hash` en `08_reglas_usuarios.sql`: si alguien intenta guardar `"Demo1234"` tal cual, la BD lo rechaza).
 
-### RN-72 · Cada rol tiene permisos distintos ⬜
+### RN-72 · Cada rol tiene permisos distintos ✅
 | Acción | admin | gerente | recepción | limpieza |
 |---|---|---|---|---|
-| Crear / cancelar reservaciones | ✔ | ✔ | ✔ | ✘ |
+| Reservaciones: crear, confirmar, cancelar, consultar | ✔ | ✔ | ✔ | ✘ |
+| Buscar disponibilidad y precios | ✔ | ✔ | ✔ | ✘ |
 | Check-in / check-out | ✔ | ✔ | ✔ | ✘ |
-| Cambiar estado de limpieza | ✔ | ✔ | ✔ | ✔ |
-| Registrar pagos | ✔ | ✔ | ✔ | ✘ |
-| Cambiar tarifas y habitaciones | ✔ | ✔ | ✘ | ✘ |
-| Gestionar usuarios | ✔ | ✘ | ✘ | ✘ |
+| Cobrar y ver estado de cuenta | ✔ | ✔ | ✔ | ✘ |
+| Registrar y buscar huéspedes | ✔ | ✔ | ✔ | ✘ |
+| Ver habitaciones | ✔ | ✔ | ✔ | ✔ |
+| Marcar cuarto en limpieza / limpio | ✔ | ✔ | ✔ | ✔ |
+| Mandar cuarto a mantenimiento o fuera de servicio (y regresarlo) | ✔ | ✔ | ✔ | ✘ |
+| Cambiar tarifas | ✔ | ✔ | ✘ | ✘ |
+| Gestionar usuarios y ver el explorador de la BD | ✔ | ✘ | ✘ | ✘ |
+
+- **Dónde se aplica:** la tabla vive en **un solo lugar**, `usuarios/domain/permisos.js`. El backend la usa en el middleware `permitir()`, y el frontend la recibe en `usuario.permisos` al iniciar sesión, para mostrar u ocultar botones. El cambio de estado de habitación se revisa en el caso de uso, porque depende del estado actual.
+- **Respuesta:** HTTP 403 con `"regla": "RN-72"`.
+
+### RN-73 · Contraseñas seguras ✅ *(nueva)*
+- **Regla:** de 8 a 72 caracteres, con letras y números. Al cambiarla hay que dar la actual, y la nueva debe ser distinta.
+- **Dónde se aplica:** dominio (`Usuario.validarPassword()`). *El 72 es el límite real de bcrypt.*
+- **Ruta:** `POST /api/auth/password` con `{ "actual": "...", "nueva": "..." }`.
+
+### RN-74 · Bloqueo tras 5 intentos fallidos ✅ *(nueva)*
+- **Regla:** después de 5 contraseñas equivocadas para el mismo correo, se bloquea el login 15 minutos (HTTP 429), aunque luego se escriba la correcta.
+- **Dónde se aplica:** caso de uso `IniciarSesion` + puerto `ContadorIntentos`.
+- **Limitación conocida:** el adaptador actual (`MemoriaContadorIntentos`) guarda la cuenta en memoria: se reinicia si se reinicia el servidor. Para varios servidores en AWS se cambiaría por un adaptador con Redis o con una tabla, **sin tocar el caso de uso** (esa es la ventaja de la arquitectura hexagonal).
+
+### RN-75 · Cada usuario solo trabaja con su hotel ✅ *(nueva)*
+- **Regla:** la recepcionista de Posada Los Arcos no puede ver ni tocar reservaciones, habitaciones ni cobros del Hotel Boutique Cañón. Solo el **admin general** (sin hotel asignado) ve todos los hoteles. Todo usuario que no es admin debe tener hotel.
+- **Dónde se aplica:** middleware `soloSuHotel()` (busca a qué hotel pertenece la reservación o la habitación) + entidad `Usuario` + BD (restricción `rn75_usuario_con_hotel`).
+- **Nota:** el registro de **huéspedes es compartido** entre los hoteles a propósito: un viajero que se hospeda en los dos no se captura dos veces.
+- **Respuesta:** HTTP 403 con `"regla": "RN-75"`.
 
 ---
 
@@ -318,9 +347,9 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ```bash
 cd backend && npm test
 ```
-Son 107 pruebas. Cubren las reglas de reservaciones, precios, huéspedes, habitaciones, pagos y estancias usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
+Son 157 pruebas. Cubren las reglas de reservaciones, precios, huéspedes, habitaciones, pagos, estancias y seguridad (permisos por rol, sesiones, bloqueo de intentos) usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
 
-**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55 y RN-60 (44 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de los archivos `05`, `06` y `07`:
+**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55, RN-60, RN-70, RN-71 y RN-75 (48 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de los archivos `05` a `08`:
 ```bash
 psql -h localhost -U pms_admin -d hotel_pms < database/03_validar_reglas.sql 2>&1 | sed 's/NOTICE:  //'
 ```
@@ -343,3 +372,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 | 2026-10-26 | RN-09, RN-10 y RN-12: confirmar y cancelar con motivo (+ RN-12 en la BD). Corregido error que guardaba las fechas un día antes | Edwin |
 | 2026-10-26 | Módulos de pagos y estancias: check-in, check-out, pagos y saldo (RN-42, 43, 52 + nuevas RN-44, 45, 46, 54, 55, 56). Total: 43 reglas | Edwin |
 | 2026-10-26 | Huéspedes, habitaciones, hoteles y precio automático (RN-61 + nuevas RN-24, 25, 31, 32, 33, 34). Total: 49 reglas | Edwin |
+| 2026-10-26 | Login y roles: RN-71, RN-72 + nuevas RN-73, 74, 75. Corregido: el explorador enviaba los hashes de contraseña al navegador. Total: 52 reglas | Edwin |
