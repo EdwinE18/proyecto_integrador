@@ -6,6 +6,9 @@ import { PostgresHabitacionReader } from '../modules/reservaciones/infrastructur
 import { PostgresReservacionRepository } from '../modules/reservaciones/infrastructure/persistence/PostgresReservacionRepository.js';
 import { CrearReservacion } from '../modules/reservaciones/application/use-cases/CrearReservacion.js';
 import { ListarReservaciones } from '../modules/reservaciones/application/use-cases/ListarReservaciones.js';
+import { ObtenerReservacion } from '../modules/reservaciones/application/use-cases/ObtenerReservacion.js';
+import { ConfirmarReservacion } from '../modules/reservaciones/application/use-cases/ConfirmarReservacion.js';
+import { CancelarReservacion } from '../modules/reservaciones/application/use-cases/CancelarReservacion.js';
 import { PostgresEsquemaRepository } from '../modules/explorador/infrastructure/persistence/PostgresEsquemaRepository.js';
 import { ListarTablas } from '../modules/explorador/application/use-cases/ListarTablas.js';
 import { VerTabla } from '../modules/explorador/application/use-cases/VerTabla.js';
@@ -19,6 +22,9 @@ const esquemaRepository = new PostgresEsquemaRepository(pool);
 export const container = {
   crearReservacion: new CrearReservacion({ reservacionRepository, habitacionReader, reloj, eventPublisher }),
   listarReservaciones: new ListarReservaciones({ reservacionRepository }),
+  obtenerReservacion: new ObtenerReservacion({ reservacionRepository }),
+  confirmarReservacion: new ConfirmarReservacion({ reservacionRepository, eventPublisher }),
+  cancelarReservacion: new CancelarReservacion({ reservacionRepository, eventPublisher }),
   listarTablas: new ListarTablas({ esquemaRepository }),
   verTabla: new VerTabla({ esquemaRepository }),
 };

@@ -47,3 +47,19 @@ DROP TRIGGER IF EXISTS trg_reglas_reservacion ON reservaciones;
 CREATE TRIGGER trg_reglas_reservacion
   BEFORE INSERT OR UPDATE OF habitacion_id, num_adultos, num_ninos ON reservaciones
   FOR EACH ROW EXECUTE FUNCTION fn_validar_reglas_reservacion();
+
+-- ---------------------------------------------------------------------
+-- RN-12: toda reservación cancelada debe tener un motivo (mínimo 5 letras)
+-- Las cancelaciones viejas sin motivo se marcan primero para no romper nada.
+-- ---------------------------------------------------------------------
+UPDATE reservaciones
+   SET motivo_cancelacion = 'Sin motivo registrado (dato anterior a RN-12)'
+ WHERE estado = 'cancelada'
+   AND (motivo_cancelacion IS NULL OR length(trim(motivo_cancelacion)) < 5);
+
+-- Se borra y se vuelve a crear para que siempre quede la versión más reciente.
+-- OJO: se usa COALESCE porque length(trim(NULL)) da NULL, y un CHECK que da
+-- NULL se considera APROBADO en SQL: sin COALESCE se colaría un motivo vacío.
+ALTER TABLE reservaciones DROP CONSTRAINT IF EXISTS rn12_cancelacion_con_motivo;
+ALTER TABLE reservaciones ADD CONSTRAINT rn12_cancelacion_con_motivo
+  CHECK (estado <> 'cancelada' OR COALESCE(length(trim(motivo_cancelacion)), 0) >= 5);

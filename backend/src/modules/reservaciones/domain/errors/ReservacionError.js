@@ -6,6 +6,9 @@ export class ReservacionError extends Error {
 export class HabitacionNoDisponibleError extends ReservacionError {
   constructor() { super('La habitación ya está reservada en esas fechas', 'RN-01'); this.status = 409; }
 }
+export class ReservacionNoEncontradaError extends ReservacionError {
+  constructor() { super('La reservación no existe'); this.status = 404; }
+}
 export class HabitacionNoEncontradaError extends ReservacionError {
   constructor() { super('La habitación no existe', 'RN-08'); this.status = 404; }
 }

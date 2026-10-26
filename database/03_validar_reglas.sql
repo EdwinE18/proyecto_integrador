@@ -68,7 +68,7 @@ BEGIN
     format(ins, c.hotel, c.lucas, c.hab, '2030-01-13', '2030-01-14', 1, 'pendiente'));
 
   PERFORM pg_temp.debe_pasar('RN-03', 'Una reservación cancelada libera las fechas (se cancela la de Ana…)',
-    'UPDATE reservaciones SET estado = ''cancelada'' WHERE fecha_entrada = ''2030-01-10''');
+    'UPDATE reservaciones SET estado = ''cancelada'', motivo_cancelacion = ''Prueba RN-03'' WHERE fecha_entrada = ''2030-01-10''');
   PERFORM pg_temp.debe_pasar('RN-03', '…y otra persona puede tomar esas fechas (10–13 ene)',
     format(ins, c.hotel, c.lucas, c.hab, '2030-01-10', '2030-01-13', 1, 'confirmada'));
 
@@ -89,7 +89,12 @@ BEGIN
   PERFORM pg_temp.debe_fallar('RN-08', 'No se puede usar una habitación de otro hotel',
     format(ins, c.hotel, c.ana, c.hab_otro_hotel, '2030-04-01', '2030-04-02', 1, 'pendiente'));
 
-  -- RN-11 y RN-13 requieren database/05_reglas_reservacion.sql
+  -- RN-11, RN-12 y RN-13 requieren database/05_reglas_reservacion.sql
+  PERFORM pg_temp.debe_fallar('RN-12', 'No se puede cancelar sin motivo',
+    $q$UPDATE reservaciones SET estado = 'cancelada' WHERE fecha_entrada = '2030-01-13'$q$);
+  PERFORM pg_temp.debe_fallar('RN-12', 'Un motivo de puros espacios no cuenta',
+    $q$UPDATE reservaciones SET estado = 'cancelada', motivo_cancelacion = '      ' WHERE fecha_entrada = '2030-01-13'$q$);
+
   PERFORM pg_temp.debe_fallar('RN-11', 'No caben 3 adultos en una habitación doble',
     format(ins, c.hotel, c.ana, c.hab, '2030-05-01', '2030-05-03', 3, 'pendiente'));
   PERFORM pg_temp.debe_pasar('RN-11', 'Sí caben 2 adultos en una habitación doble',
@@ -102,7 +107,7 @@ BEGIN
   PERFORM pg_temp.debe_fallar('RN-13', '…y ya no se puede reservar',
     format(ins, c.hotel, c.ana, c.hab, '2030-06-01', '2030-06-03', 1, 'pendiente'));
   PERFORM pg_temp.debe_pasar('RN-13', '…pero sus reservaciones previas se pueden seguir editando',
-    $q$UPDATE reservaciones SET estado = 'cancelada' WHERE fecha_entrada = '2030-05-01'$q$);
+    $q$UPDATE reservaciones SET estado = 'cancelada', motivo_cancelacion = 'Cuarto en mantenimiento' WHERE fecha_entrada = '2030-05-01'$q$);
   PERFORM pg_temp.debe_pasar('RN-13', 'Se regresa la habitación a disponible',
     format('UPDATE habitaciones SET estado = ''disponible'' WHERE id = %L', c.hab));
 

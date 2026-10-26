@@ -94,6 +94,32 @@ Para crear un módulo nuevo copia el patrón de `reservaciones`: entidad → pue
 
 ---
 
+## API de reservaciones
+
+Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuesta incluye el campo `"regla"` (por ejemplo `"RN-11"`), que se busca en `docs/REGLAS_DE_NEGOCIO.md`.
+
+| Método | Ruta | Qué hace | Reglas |
+|---|---|---|---|
+| `POST` | `/api/reservaciones` | Crea una reservación (queda `pendiente`) | RN-01, 04, 05, 08, 11, 13, 14 |
+| `GET` | `/api/reservaciones?hotelId=&desde=&hasta=` | Lista las reservaciones de un hotel en un rango de fechas | — |
+| `GET` | `/api/reservaciones/:id` | Consulta una reservación | — |
+| `PATCH` | `/api/reservaciones/:id/confirmar` | `pendiente → confirmada` | RN-09 |
+| `PATCH` | `/api/reservaciones/:id/cancelar` | Cancela. Cuerpo: `{ "motivo": "..." }` | RN-10, RN-12 |
+| `GET` | `/api/explorador/tablas` | Lista las tablas de la BD (página en `http://localhost:3000`) | — |
+
+Ejemplo:
+```bash
+curl -X POST http://localhost:3000/api/reservaciones -H 'Content-Type: application/json' -d '{
+  "hotelId": "11111111-1111-1111-1111-111111111111",
+  "huespedId": "b0000000-0000-0000-0000-000000000001",
+  "habitacionId": "<id de una habitación>",
+  "entrada": "2026-12-20", "salida": "2026-12-22",
+  "numAdultos": 2, "numNinos": 0, "precioNoche": 1100
+}'
+```
+
+---
+
 ## 3. Base de datos
 
 | # | Tabla | Para qué sirve |

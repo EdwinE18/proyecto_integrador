@@ -26,7 +26,7 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 
 | Módulo | ✅ | 🟡 | ⬜ | ❓ |
 |---|---|---|---|---|
-| Reservaciones | 11 | 2 | 1 | 1 |
+| Reservaciones | 14 | 0 | 0 | 1 |
 | Habitaciones | 4 | 0 | 0 | 0 |
 | Huéspedes | 1 | 0 | 0 | 0 |
 | Estancias (check-in / check-out) | 2 | 0 | 2 | 0 |
@@ -34,7 +34,7 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Tarifas | 1 | 0 | 1 | 0 |
 | Usuarios y seguridad | 1 | 0 | 2 | 0 |
 | Automatización y notificaciones | 1 | 0 | 2 | 1 |
-| **Total** | **23** | **2** | **9** | **3** |
+| **Total** | **26** | **0** | **8** | **3** |
 
 ---
 
@@ -82,15 +82,15 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Regla:** no se puede reservar el cuarto de la posada A como si fuera del hotel B.
 - **Dónde se aplica:** BD (trigger `trg_reservacion_hotel`).
 
-### RN-09 · Solo se confirma una reservación pendiente 🟡
-- **Regla:** el paso válido es `pendiente → confirmada`.
-- **Implementado:** dominio (`Reservacion.confirmar()`).
-- **Falta:** caso de uso y ruta HTTP para confirmar.
+### RN-09 · Solo se confirma una reservación pendiente ✅
+- **Regla:** el único paso válido es `pendiente → confirmada`. Confirmar algo ya confirmado, cancelado o terminado se rechaza.
+- **Dónde se aplica:** dominio (`Reservacion.confirmar()`) + caso de uso `ConfirmarReservacion` + ruta `PATCH /api/reservaciones/:id/confirmar`. Publica el evento `reservacion.confirmada`.
+- **Cómo validarlo:** confirmar dos veces la misma reservación. La segunda vez responde HTTP 400 con `"regla": "RN-09"`.
 
-### RN-10 · No se cancela una estancia en curso o terminada 🟡
-- **Regla:** no se puede cancelar una reservación en `check_in` o `check_out`.
-- **Implementado:** dominio (`Reservacion.cancelar()`).
-- **Falta:** caso de uso, ruta HTTP y exigir `motivo_cancelacion` (ver RN-12).
+### RN-10 · Solo se cancela una reservación que todavía no empieza ✅
+- **Regla:** solo se pueden cancelar reservaciones `pendiente` o `confirmada`. Una en `check_in`, `check_out`, `no_show` o ya `cancelada` no se cancela.
+- **Dónde se aplica:** dominio (`Reservacion.cancelar()`) + caso de uso `CancelarReservacion` + ruta `PATCH /api/reservaciones/:id/cancelar`. Publica el evento `reservacion.cancelada`, y al cancelar se liberan las fechas (RN-03).
+- **Cómo validarlo:** cancelar dos veces la misma reservación. La segunda vez responde HTTP 400 con `"regla": "RN-10"`.
 
 ### RN-11 · No se reserva más gente de la que cabe en la habitación ✅
 - **Regla:** `num_adultos ≤ capacidad_adultos` y `num_ninos ≤ capacidad_ninos` del tipo de habitación.
@@ -99,8 +99,13 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
   - **BD:** trigger `trg_reglas_reservacion` (`database/05_reglas_reservacion.sql`). También impide **editar** una reservación existente para meter más gente.
 - **Cómo validarlo:** reservar 3 adultos en una habitación doble. Debe fallar.
 
-### RN-12 · Toda cancelación debe tener motivo ⬜
-- **Regla:** al cancelar es obligatorio llenar `motivo_cancelacion`, para que el hotel pueda analizar por qué pierde clientes.
+### RN-12 · Toda cancelación debe tener motivo ✅
+- **Regla:** al cancelar es obligatorio dar un motivo de al menos 5 caracteres. Se guarda en `motivo_cancelacion`, para que el hotel pueda analizar por qué pierde clientes. Los espacios de más se limpian.
+- **Dónde se aplica:**
+  - **Dominio:** `Reservacion.cancelar(motivo)`. Responde HTTP 400.
+  - **BD:** restricción `rn12_cancelacion_con_motivo` (`05_reglas_reservacion.sql`).
+- **Lección aprendida:** la primera versión del `CHECK` dejaba pasar un motivo vacío, porque en SQL `length(trim(NULL))` da `NULL` y un `CHECK` que da `NULL` **se considera aprobado**. La prueba automática lo detectó y se corrigió con `COALESCE`.
+- **Cómo validarlo:** `PATCH /api/reservaciones/:id/cancelar` con cuerpo `{}`. Debe responder HTTP 400 con `"regla": "RN-12"`.
 
 ### RN-13 · No se reservan habitaciones en mantenimiento o fuera de servicio ✅
 - **Regla:** no se puede reservar una habitación en `mantenimiento`, en `fuera_servicio` o dada de baja (`activo = false`). Una habitación en `limpieza` **sí** se puede reservar, porque es temporal.
@@ -235,9 +240,9 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ```bash
 cd backend && npm test
 ```
-Son 16 pruebas: cubren RN-01, 04, 05, 06, 08, 11, 13 y 14 usando adaptadores falsos (arquitectura hexagonal).
+Son 37 pruebas. Cubren RN-01, 04, 05, 06, 08, 09, 10, 11, 12, 13 y 14 usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
 
-**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-13, RN-20, RN-22, RN-23, RN-30, RN-41, RN-50 y RN-60. No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de `05_reglas_reservacion.sql`:
+**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-41, RN-50 y RN-60. No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de `05_reglas_reservacion.sql`:
 ```bash
 psql -h localhost -U pms_admin -d hotel_pms < database/03_validar_reglas.sql 2>&1 | sed 's/NOTICE:  //'
 ```
@@ -257,3 +262,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 |---|---|---|
 | 2026-10-07 | Primera versión: 37 reglas documentadas | Equipo |
 | 2026-10-26 | RN-11, RN-13 y RN-14 implementadas en el dominio (+ RN-11 y RN-13 en la BD) | Edwin |
+| 2026-10-26 | RN-09, RN-10 y RN-12: confirmar y cancelar con motivo (+ RN-12 en la BD). Corregido error que guardaba las fechas un día antes | Edwin |

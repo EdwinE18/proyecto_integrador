@@ -7,7 +7,7 @@ const aEntidad = (r) => new Reservacion({
   id: r.id, codigo: r.codigo, hotelId: r.hotel_id, huespedId: r.huesped_id,
   habitacionId: r.habitacion_id, entrada: r.fecha_entrada, salida: r.fecha_salida,
   numAdultos: r.num_adultos, numNinos: r.num_ninos, precioNoche: r.precio_noche,
-  estado: r.estado, canal: r.canal,
+  estado: r.estado, canal: r.canal, motivoCancelacion: r.motivo_cancelacion, creadaEn: r.created_at,
 });
 
 export class PostgresReservacionRepository extends ReservacionRepository {
@@ -19,7 +19,7 @@ export class PostgresReservacionRepository extends ReservacionRepository {
         `INSERT INTO reservaciones (hotel_id, huesped_id, habitacion_id, fecha_entrada, fecha_salida,
                                     num_adultos, num_ninos, precio_noche, total, estado, canal)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-        [r.hotelId, r.huespedId, r.habitacionId, r.rango.entrada, r.rango.salida,
+        [r.hotelId, r.huespedId, r.habitacionId, r.rango.entradaISO, r.rango.salidaISO,
          r.numAdultos, r.numNinos, r.precioNoche, r.total, r.estado, r.canal]);
       return aEntidad(rows[0]);
     } catch (e) {
@@ -37,6 +37,19 @@ export class PostgresReservacionRepository extends ReservacionRepository {
     return rows[0] ? aEntidad(rows[0]) : null;
   }
 
+  async actualizarEstado(r) {
+    try {
+      const { rows } = await this.pool.query(
+        `UPDATE reservaciones SET estado = $2, motivo_cancelacion = $3 WHERE id = $1 RETURNING *`,
+        [r.id, r.estado, r.motivoCancelacion]);
+      return rows[0] ? aEntidad(rows[0]) : null;
+    } catch (e) {
+      // Al reactivar fechas, la BD podría detectar una sobreventa
+      if (e.code === '23P01') throw new HabitacionNoDisponibleError();
+      throw e;
+    }
+  }
+
   async listarPorHotel(hotelId, { desde, hasta }) {
     const { rows } = await this.pool.query(
       `SELECT * FROM reservaciones WHERE hotel_id = $1
@@ -51,7 +64,7 @@ export class PostgresReservacionRepository extends ReservacionRepository {
          SELECT 1 FROM reservaciones WHERE habitacion_id = $1
            AND estado IN ('pendiente','confirmada','check_in')
            AND daterange(fecha_entrada, fecha_salida, '[)') && daterange($2::date, $3::date, '[)')
-       ) AS libre`, [habitacionId, rango.entrada, rango.salida]);
+       ) AS libre`, [habitacionId, rango.entradaISO, rango.salidaISO]);
     return rows[0].libre;
   }
 }
