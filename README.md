@@ -59,16 +59,18 @@ hotel-pms/
 │   │   ├── modules/                       # un módulo por contexto del negocio
 │   │   │   ├── reservaciones/             # ← módulo de ejemplo ya implementado
 │   │   │   │   ├── domain/
-│   │   │   │   │   ├── entities/          # Reservacion.js
+│   │   │   │   │   ├── entities/          # Reservacion.js (ciclo de vida completo)
 │   │   │   │   │   ├── value-objects/     # RangoFechas.js
 │   │   │   │   │   ├── errors/            # ReservacionError.js
-│   │   │   │   │   └── ports/             # ReservacionRepository.js, EventPublisher.js
-│   │   │   │   ├── application/use-cases/ # CrearReservacion.js, ListarReservaciones.js
+│   │   │   │   │   └── ports/             # ReservacionRepository, HabitacionReader, Reloj, EventPublisher
+│   │   │   │   ├── application/use-cases/ # Crear, Listar, Obtener, Confirmar, Cancelar
 │   │   │   │   └── infrastructure/
 │   │   │   │       ├── http/              # reservacion.routes.js   (adaptador entrada)
 │   │   │   │       └── persistence/       # PostgresReservacionRepository.js (salida)
-│   │   │   ├── hoteles/  habitaciones/  huespedes/
-│   │   │   └── estancias/  pagos/  usuarios/   # misma estructura, por implementar
+│   │   │   ├── pagos/                     # ✅ Dinero (centavos), Pago, CuentaReservacion
+│   │   │   ├── estancias/                 # ✅ Estancia, check-in y check-out (transacciones)
+│   │   │   ├── explorador/                # ✅ Página para ver la BD
+│   │   │   └── hoteles/  habitaciones/  huespedes/  usuarios/   # misma estructura, por implementar
 │   │   ├── shared/
 │   │   │   ├── container.js               # inyección de dependencias
 │   │   │   └── infrastructure/            # pool BD, config, outbox, middlewares
@@ -94,7 +96,7 @@ Para crear un módulo nuevo copia el patrón de `reservaciones`: entidad → pue
 
 ---
 
-## API de reservaciones
+## API
 
 Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuesta incluye el campo `"regla"` (por ejemplo `"RN-11"`), que se busca en `docs/REGLAS_DE_NEGOCIO.md`.
 
@@ -105,6 +107,10 @@ Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuest
 | `GET` | `/api/reservaciones/:id` | Consulta una reservación | — |
 | `PATCH` | `/api/reservaciones/:id/confirmar` | `pendiente → confirmada` | RN-09 |
 | `PATCH` | `/api/reservaciones/:id/cancelar` | Cancela. Cuerpo: `{ "motivo": "..." }` | RN-10, RN-12 |
+| `GET` | `/api/reservaciones/:id/pagos` | Estado de cuenta: total, pagado, saldo y pagos | RN-51 |
+| `POST` | `/api/reservaciones/:id/pagos` | Registra un pago. Cuerpo: `{ "monto", "metodo", "referencia"?, "esAnticipo"? }` | RN-50, 54, 55, 56 |
+| `POST` | `/api/reservaciones/:id/check-in` | Llegada del huésped. Cuerpo opcional: `{ "placas", "observaciones" }` | RN-42, 44, 45, 46 |
+| `POST` | `/api/reservaciones/:id/check-out` | Salida del huésped (el cuarto pasa a limpieza) | RN-43, 52 |
 | `GET` | `/api/explorador/tablas` | Lista las tablas de la BD (página en `http://localhost:3000`) | — |
 
 Ejemplo:

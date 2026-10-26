@@ -138,6 +138,32 @@ BEGIN
   PERFORM pg_temp.debe_fallar('RN-50', 'Un pago no puede ser de $0',
     $q$INSERT INTO pagos (reservacion_id, monto, metodo) SELECT id, 0, 'efectivo' FROM reservaciones LIMIT 1$q$);
 
+  -- RN-42 a RN-55 requieren database/06_reglas_estancias_pagos.sql
+  -- Se usa la reservación de Lucas del 10 al 13 de enero (confirmada, total $1000)
+  PERFORM pg_temp.debe_fallar('RN-54', 'No se puede cobrar más que el total ($1500 de $1000)',
+    $q$INSERT INTO pagos (reservacion_id, monto, metodo) SELECT id, 1500, 'efectivo' FROM reservaciones WHERE fecha_entrada = '2030-01-10' AND estado = 'confirmada'$q$);
+  PERFORM pg_temp.debe_pasar('RN-54', 'Se registra un anticipo de $600',
+    $q$INSERT INTO pagos (reservacion_id, monto, metodo, es_anticipo) SELECT id, 600, 'efectivo', true FROM reservaciones WHERE fecha_entrada = '2030-01-10' AND estado = 'confirmada'$q$);
+  PERFORM pg_temp.debe_fallar('RN-54', 'Con $600 pagados, no se aceptan $500 más (sería $1100)',
+    $q$INSERT INTO pagos (reservacion_id, monto, metodo) SELECT id, 500, 'efectivo' FROM reservaciones WHERE fecha_entrada = '2030-01-10' AND estado = 'confirmada'$q$);
+
+  PERFORM pg_temp.debe_fallar('RN-42', 'No se hace check-in de una reservación pendiente',
+    $q$UPDATE reservaciones SET estado = 'check_in' WHERE fecha_entrada = '2030-01-13'$q$);
+  PERFORM pg_temp.debe_fallar('RN-43', 'No se hace check-out sin haber hecho check-in',
+    $q$UPDATE reservaciones SET estado = 'check_out' WHERE fecha_entrada = '2030-01-10' AND estado = 'confirmada'$q$);
+  PERFORM pg_temp.debe_pasar('RN-42', 'Sí se hace check-in de una reservación confirmada',
+    $q$UPDATE reservaciones SET estado = 'check_in' WHERE fecha_entrada = '2030-01-10' AND estado = 'confirmada'$q$);
+  PERFORM pg_temp.debe_fallar('RN-52', 'No se hace check-out debiendo $400',
+    $q$UPDATE reservaciones SET estado = 'check_out' WHERE fecha_entrada = '2030-01-10' AND estado = 'check_in'$q$);
+  PERFORM pg_temp.debe_pasar('RN-52', 'Se paga el resto ($400)…',
+    $q$INSERT INTO pagos (reservacion_id, monto, metodo) SELECT id, 400, 'tarjeta' FROM reservaciones WHERE fecha_entrada = '2030-01-10' AND estado = 'check_in'$q$);
+  PERFORM pg_temp.debe_pasar('RN-52', '…y ya se puede hacer check-out',
+    $q$UPDATE reservaciones SET estado = 'check_out' WHERE fecha_entrada = '2030-01-10' AND estado = 'check_in'$q$);
+  PERFORM pg_temp.debe_fallar('RN-55', 'No se cobra a una reservación que ya hizo check-out',
+    $q$INSERT INTO pagos (reservacion_id, monto, metodo) SELECT id, 1, 'efectivo' FROM reservaciones WHERE fecha_entrada = '2030-01-10' AND estado = 'check_out'$q$);
+  PERFORM pg_temp.debe_fallar('RN-55', 'No se cobra a una reservación cancelada',
+    $q$INSERT INTO pagos (reservacion_id, monto, metodo) SELECT id, 1, 'efectivo' FROM reservaciones WHERE fecha_entrada = '2030-01-10' AND estado = 'cancelada'$q$);
+
   PERFORM pg_temp.debe_pasar('RN-60', 'Se crea la temporada Semana Santa (24–31 mar)…',
     $q$INSERT INTO tarifas_temporada (tipo_id, nombre, fecha_inicio, fecha_fin, precio_noche)
        VALUES ('a0000000-0000-0000-0000-000000000002', 'Semana Santa', '2030-03-24', '2030-03-31', 1500)$q$);

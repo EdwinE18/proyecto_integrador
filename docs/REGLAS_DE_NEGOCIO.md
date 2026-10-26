@@ -29,12 +29,12 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Reservaciones | 14 | 0 | 0 | 1 |
 | Habitaciones | 4 | 0 | 0 | 0 |
 | Huéspedes | 1 | 0 | 0 | 0 |
-| Estancias (check-in / check-out) | 2 | 0 | 2 | 0 |
-| Pagos | 2 | 0 | 1 | 1 |
+| Estancias (check-in / check-out) | 7 | 0 | 0 | 0 |
+| Pagos | 6 | 0 | 0 | 1 |
 | Tarifas | 1 | 0 | 1 | 0 |
 | Usuarios y seguridad | 1 | 0 | 2 | 0 |
 | Automatización y notificaciones | 1 | 0 | 2 | 1 |
-| **Total** | **26** | **0** | **8** | **3** |
+| **Total** | **35** | **0** | **5** | **3** |
 
 ---
 
@@ -161,25 +161,62 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ### RN-41 · El check-out es posterior al check-in ✅
 - **Dónde se aplica:** BD (`CHECK`).
 
-### RN-42 · Solo se hace check-in de una reservación confirmada ⬜
-- **Regla:** al hacer check-in, la reservación pasa de `confirmada` a `check_in` y la habitación pasa a `ocupada`.
+### RN-42 · Solo se hace check-in de una reservación confirmada ✅
+- **Regla:** el paso válido es `confirmada → check_in`. Una reservación pendiente (sin confirmar), cancelada o ya hospedada no hace check-in.
+- **Dónde se aplica:** dominio (`Reservacion.registrarCheckIn()`) + BD (trigger `trg_reglas_estancia` en `06_reglas_estancias_pagos.sql`).
+- **Efecto:** en **una sola transacción** la reservación pasa a `check_in`, la habitación a `ocupada` y se crea la estancia con la hora real de llegada. Si algo falla, no se guarda nada. Publica `estancia.check_in`.
+- **Ruta:** `POST /api/reservaciones/:id/check-in` (cuerpo opcional: `{ "placas": "...", "observaciones": "..." }`).
 
-### RN-43 · Al hacer check-out la habitación pasa a limpieza ⬜
-- **Regla:** la reservación pasa a `check_out`, la habitación a `limpieza`, y se avisa por Telegram al personal de limpieza. Ver también RN-52.
+### RN-43 · Al hacer check-out la habitación pasa a limpieza ✅
+- **Regla:** solo se hace check-out de una estancia en curso (`check_in → check_out`). En una sola transacción, la habitación pasa a `limpieza` y se guarda la hora real de salida.
+- **Dónde se aplica:** dominio (`Reservacion.registrarCheckOut()`) + BD (trigger `trg_reglas_estancia`).
+- **Aviso a limpieza:** publica el evento `estancia.check_out` con el número de habitación. Falta el flujo de n8n que manda el Telegram (RN-81).
+- **Ruta:** `POST /api/reservaciones/:id/check-out`. Requiere RN-52.
+
+### RN-44 · El check-in solo se hace durante las fechas reservadas ✅ *(nueva)*
+- **Regla:** desde el día de entrada y antes del día de salida. Se puede llegar tarde (el segundo día), pero no antes del día de entrada, porque el cuarto puede estar ocupado por otro huésped.
+- **Dónde se aplica:** dominio, con la fecha de hoy del puerto `Reloj` (hora de Chiapas).
+
+### RN-45 · Solo se entrega una habitación lista ✅ *(nueva)*
+- **Regla:** para hacer check-in, la habitación debe estar `disponible`. Si está en `limpieza`, `ocupada` (el huésped anterior no ha hecho check-out) o en `mantenimiento`, se rechaza con un mensaje que dice por qué.
+- **Dónde se aplica:** dominio (`reglasHabitacion.js`) + adaptador (el `UPDATE ... WHERE estado = 'disponible'` evita que dos recepcionistas entreguen el mismo cuarto a la vez).
+- **Diferencia con RN-13:** un cuarto en limpieza **sí se puede reservar** para otra fecha, pero **no se puede entregar** hasta que esté limpio.
+
+### RN-46 · Las placas del vehículo se guardan normalizadas ✅ *(nueva)*
+- **Regla:** se quitan espacios y guiones y se pasan a mayúsculas (`"dbc-12 34"` → `"DBC1234"`). Deben quedar entre 5 y 10 letras o números. Son opcionales.
+- **Dónde se aplica:** dominio (`Estancia.normalizarPlacas()`).
 
 ---
 
 ## 5. Pagos
 
-### RN-50 · Todo pago tiene un monto mayor a cero ✅
-- **Dónde se aplica:** BD (`CHECK (monto > 0)`).
+### RN-50 · Todo pago tiene un monto mayor a cero y un método válido ✅
+- **Regla:** monto > 0, con máximo 2 decimales. Método: `efectivo`, `tarjeta`, `transferencia` o `deposito`.
+- **Dónde se aplica:** dominio (`Pago`, `Dinero`) + BD (`CHECK (monto > 0)`).
+- **Detalle técnico:** el dinero se maneja en **centavos enteros** (objeto de valor `Dinero`), porque en JavaScript `0.1 + 0.2 = 0.30000000000000004`.
 
 ### RN-51 · El saldo pendiente se calcula solo ✅
 - **Regla:** `saldo = total − suma de pagos`.
-- **Dónde se aplica:** BD (vista `v_saldo_reservaciones`).
+- **Dónde se aplica:** dominio (`CuentaReservacion.saldo`) + BD (vista `v_saldo_reservaciones`).
+- **Ruta:** `GET /api/reservaciones/:id/pagos` devuelve total, pagado, saldo y la lista de pagos.
 
-### RN-52 · No se hace check-out con saldo pendiente ⬜
-- **Regla:** el saldo debe ser 0 para cerrar la estancia.
+### RN-52 · No se hace check-out con saldo pendiente ✅
+- **Regla:** el saldo debe ser $0 para cerrar la estancia. El mensaje dice cuánto falta.
+- **Dónde se aplica:** caso de uso `RegistrarCheckOut` + BD (trigger `trg_reglas_estancia`).
+
+### RN-54 · No se cobra más que el saldo pendiente ✅ *(nueva)*
+- **Regla:** la suma de pagos nunca puede pasar del total de la reservación.
+- **Dónde se aplica:** dominio (`CuentaReservacion.validarPago()`) + BD (trigger `trg_reglas_pago`).
+- **Cobros simultáneos:** el trigger usa `SELECT ... FOR UPDATE`, que bloquea la reservación mientras se revisa el saldo. Se probó con 10 cobros de $1,500 al mismo tiempo sobre una cuenta de $2,000: pasó 1 y la BD rechazó 9. Sin el bloqueo, dos cobros podrían pasar a la vez.
+
+### RN-55 · Solo se cobra a reservaciones activas ✅ *(nueva)*
+- **Regla:** se aceptan pagos en `pendiente`, `confirmada` y `check_in`. No en `cancelada`, `no_show` ni `check_out`.
+- **Dónde se aplica:** dominio + BD (trigger `trg_reglas_pago`).
+
+### RN-56 · Transferencias y depósitos llevan número de referencia ✅ *(nueva)*
+- **Regla:** sin referencia no se puede rastrear el dinero en el banco. Se guarda limpia y en mayúsculas.
+- **Dónde se aplica:** dominio (`Pago`).
+- **Ruta:** `POST /api/reservaciones/:id/pagos` con `{ "monto": 1500, "metodo": "transferencia", "referencia": "SPEI123", "esAnticipo": true }`.
 
 ### RN-53 · ¿Cuánto anticipo se pide para confirmar? ❓
 - **Pregunta para el hotel:** ¿qué porcentaje de anticipo se pide para confirmar (ej. 30 % o 50 %)? ¿Hay reembolso si se cancela?
@@ -240,9 +277,9 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ```bash
 cd backend && npm test
 ```
-Son 37 pruebas. Cubren RN-01, 04, 05, 06, 08, 09, 10, 11, 12, 13 y 14 usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
+Son 72 pruebas. Cubren las reglas de reservaciones, pagos y estancias usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
 
-**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-41, RN-50 y RN-60. No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de `05_reglas_reservacion.sql`:
+**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55 y RN-60 (40 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de `05_reglas_reservacion.sql` y `06_reglas_estancias_pagos.sql`:
 ```bash
 psql -h localhost -U pms_admin -d hotel_pms < database/03_validar_reglas.sql 2>&1 | sed 's/NOTICE:  //'
 ```
@@ -263,3 +300,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 | 2026-10-07 | Primera versión: 37 reglas documentadas | Equipo |
 | 2026-10-26 | RN-11, RN-13 y RN-14 implementadas en el dominio (+ RN-11 y RN-13 en la BD) | Edwin |
 | 2026-10-26 | RN-09, RN-10 y RN-12: confirmar y cancelar con motivo (+ RN-12 en la BD). Corregido error que guardaba las fechas un día antes | Edwin |
+| 2026-10-26 | Módulos de pagos y estancias: check-in, check-out, pagos y saldo (RN-42, 43, 52 + nuevas RN-44, 45, 46, 54, 55, 56). Total: 43 reglas | Edwin |

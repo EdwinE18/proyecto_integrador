@@ -1,6 +1,6 @@
 // Errores del dominio. Cada uno indica qué regla de negocio se rompió (ver docs/REGLAS_DE_NEGOCIO.md)
 export class ReservacionError extends Error {
-  constructor(msg, regla) { super(msg); this.name = 'ReservacionError'; this.status = 400; this.regla = regla; }
+  constructor(msg, regla, status = 400) { super(msg); this.name = 'ReservacionError'; this.status = status; this.regla = regla; }
 }
 // RN-01
 export class HabitacionNoDisponibleError extends ReservacionError {

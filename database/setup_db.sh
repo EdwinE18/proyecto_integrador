@@ -33,9 +33,10 @@ sudo -u postgres psql -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;
 echo "▶ Creando tablas..."
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$DIR/01_schema.sql"
 
-echo "▶ Aplicando funciones de cadena y reglas de reservación..."
+echo "▶ Aplicando funciones de cadena y reglas de negocio..."
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/04_funciones_cadena.sql" >/dev/null
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/05_reglas_reservacion.sql"
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/06_reglas_estancias_pagos.sql"
 
 read -rp "¿Cargar datos de prueba? (s/n) " R
 [[ "$R" == "s" ]] && PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/02_seed.sql"

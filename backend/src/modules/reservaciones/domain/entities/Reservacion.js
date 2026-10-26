@@ -71,4 +71,26 @@ export class Reservacion {
     this.estado = 'cancelada';
     this.motivoCancelacion = limpio;
   }
+
+  /**
+   * RN-42: solo se hace check-in de una reservación confirmada.
+   * RN-44: solo entre el día de entrada y antes del día de salida.
+   * @param {string} hoy 'YYYY-MM-DD'
+   */
+  registrarCheckIn(hoy) {
+    if (this.estado !== 'confirmada')
+      throw new ReservacionError(`Solo se hace check-in de reservaciones confirmadas (esta está ${this.estado})`, 'RN-42', 409);
+    if (hoy < this.rango.entradaISO)
+      throw new ReservacionError(`Todavía no se puede hacer check-in: la entrada es el ${this.rango.entradaISO}`, 'RN-44');
+    if (hoy >= this.rango.salidaISO)
+      throw new ReservacionError(`La estancia ya terminó (salida: ${this.rango.salidaISO}); márcala como no show`, 'RN-44');
+    this.estado = 'check_in';
+  }
+
+  /** RN-43: solo se hace check-out de una estancia en curso */
+  registrarCheckOut() {
+    if (this.estado !== 'check_in')
+      throw new ReservacionError(`Solo se hace check-out de una estancia en curso (esta está ${this.estado})`, 'RN-43', 409);
+    this.estado = 'check_out';
+  }
 }
