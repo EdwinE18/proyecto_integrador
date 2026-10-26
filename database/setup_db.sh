@@ -13,6 +13,7 @@ if ! command -v psql >/dev/null; then
   echo "▶ Instalando PostgreSQL..."
   sudo apt update && sudo apt install -y postgresql postgresql-contrib
 fi
+# En WSL no siempre hay systemctl: si falla, se usa service
 sudo systemctl enable --now postgresql 2>/dev/null || sudo service postgresql start
 
 echo "▶ Creando usuario y base de datos..."
@@ -31,6 +32,10 @@ sudo -u postgres psql -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 echo "▶ Creando tablas..."
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$DIR/01_schema.sql"
+
+echo "▶ Aplicando funciones de cadena y reglas de reservación..."
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/04_funciones_cadena.sql" >/dev/null
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/05_reglas_reservacion.sql"
 
 read -rp "¿Cargar datos de prueba? (s/n) " R
 [[ "$R" == "s" ]] && PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/02_seed.sql"

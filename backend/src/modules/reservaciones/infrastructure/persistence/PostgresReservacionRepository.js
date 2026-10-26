@@ -1,7 +1,7 @@
 // ADAPTADOR DE SALIDA: implementa el puerto usando PostgreSQL.
 import { ReservacionRepository } from '../../domain/ports/ReservacionRepository.js';
 import { Reservacion } from '../../domain/entities/Reservacion.js';
-import { HabitacionNoDisponibleError } from '../../domain/errors/ReservacionError.js';
+import { HabitacionNoDisponibleError, ReservacionError } from '../../domain/errors/ReservacionError.js';
 
 const aEntidad = (r) => new Reservacion({
   id: r.id, codigo: r.codigo, hotelId: r.hotel_id, huespedId: r.huesped_id,
@@ -25,6 +25,9 @@ export class PostgresReservacionRepository extends ReservacionRepository {
     } catch (e) {
       // 23P01 = exclusion_violation → la BD detectó una sobreventa (carrera entre 2 recepcionistas)
       if (e.code === '23P01') throw new HabitacionNoDisponibleError();
+      // 23514 = check_violation lanzado por trg_reglas_reservacion (RN-11 / RN-13)
+      const regla = e.code === '23514' && /^(RN-\d+):\s*(.*)$/.exec(e.message ?? '');
+      if (regla) throw Object.assign(new ReservacionError(regla[2], regla[1]), { status: regla[1] === 'RN-13' ? 409 : 400 });
       throw e;
     }
   }
