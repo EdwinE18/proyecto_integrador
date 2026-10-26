@@ -7,6 +7,9 @@ import { reservacionRoutes } from './modules/reservaciones/infrastructure/http/r
 import { pagoRoutes } from './modules/pagos/infrastructure/http/pago.routes.js';
 import { estanciaRoutes } from './modules/estancias/infrastructure/http/estancia.routes.js';
 import { validarUUID } from './shared/infrastructure/http/middlewares/validarUUID.js';
+import { huespedRoutes } from './modules/huespedes/infrastructure/http/huesped.routes.js';
+import { hotelRoutes } from './modules/hoteles/infrastructure/http/hotel.routes.js';
+import { habitacionesDeHotelRoutes, habitacionRoutes } from './modules/habitaciones/infrastructure/http/habitacion.routes.js';
 import { exploradorRoutes } from './modules/explorador/infrastructure/http/explorador.routes.js';
 import { errorHandler } from './shared/infrastructure/http/middlewares/errorHandler.js';
 
@@ -23,6 +26,10 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/reservaciones/:id/pagos', validarUUID(), pagoRoutes(container));
 app.use('/api/reservaciones/:id', validarUUID(), estanciaRoutes(container));   // /check-in, /check-out
 app.use('/api/reservaciones', reservacionRoutes(container));
+app.use('/api/huespedes', huespedRoutes(container));
+app.use('/api/hoteles', hotelRoutes(container));
+app.use('/api/hoteles/:hotelId', validarUUID('hotelId', 'El hotel no existe'), habitacionesDeHotelRoutes(container));
+app.use('/api/habitaciones', habitacionRoutes(container));
 app.use('/api/explorador', exploradorRoutes(container));
 
 app.use(errorHandler);

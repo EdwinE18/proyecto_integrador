@@ -69,8 +69,11 @@ hotel-pms/
 │   │   │   │       └── persistence/       # PostgresReservacionRepository.js (salida)
 │   │   │   ├── pagos/                     # ✅ Dinero (centavos), Pago, CuentaReservacion
 │   │   │   ├── estancias/                 # ✅ Estancia, check-in y check-out (transacciones)
+│   │   │   ├── huespedes/                 # ✅ Huesped (normaliza y valida), búsqueda
+│   │   │   ├── habitaciones/              # ✅ Habitacion (estados RN-24), disponibilidad con precio
+│   │   │   ├── hoteles/                   # ✅ Lista de hoteles con ocupación del día
 │   │   │   ├── explorador/                # ✅ Página para ver la BD
-│   │   │   └── hoteles/  habitaciones/  huespedes/  usuarios/   # misma estructura, por implementar
+│   │   │   └── usuarios/                  # ⬜ Login y roles (siguiente)
 │   │   ├── shared/
 │   │   │   ├── container.js               # inyección de dependencias
 │   │   │   └── infrastructure/            # pool BD, config, outbox, middlewares
@@ -102,7 +105,7 @@ Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuest
 
 | Método | Ruta | Qué hace | Reglas |
 |---|---|---|---|
-| `POST` | `/api/reservaciones` | Crea una reservación (queda `pendiente`) | RN-01, 04, 05, 08, 11, 13, 14 |
+| `POST` | `/api/reservaciones` | Crea una reservación (queda `pendiente`). **El precio lo calcula el sistema** | RN-01, 04, 05, 08, 11, 13, 14, 61 |
 | `GET` | `/api/reservaciones?hotelId=&desde=&hasta=` | Lista las reservaciones de un hotel en un rango de fechas | — |
 | `GET` | `/api/reservaciones/:id` | Consulta una reservación | — |
 | `PATCH` | `/api/reservaciones/:id/confirmar` | `pendiente → confirmada` | RN-09 |
@@ -111,6 +114,14 @@ Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuest
 | `POST` | `/api/reservaciones/:id/pagos` | Registra un pago. Cuerpo: `{ "monto", "metodo", "referencia"?, "esAnticipo"? }` | RN-50, 54, 55, 56 |
 | `POST` | `/api/reservaciones/:id/check-in` | Llegada del huésped. Cuerpo opcional: `{ "placas", "observaciones" }` | RN-42, 44, 45, 46 |
 | `POST` | `/api/reservaciones/:id/check-out` | Salida del huésped (el cuarto pasa a limpieza) | RN-43, 52 |
+| `GET` | `/api/hoteles` | Hoteles con su ocupación de hoy | — |
+| `GET` | `/api/hoteles/:hotelId/habitaciones` | Habitaciones del hotel con estado, tipo y precio base | — |
+| `GET` | `/api/hoteles/:hotelId/disponibilidad?entrada=&salida=&adultos=&ninos=` | Cuartos libres con total y desglose por noche | RN-01, 11, 13, 14, 61 |
+| `PATCH` | `/api/habitaciones/:id/estado` | Cambia el estado. Cuerpo: `{ "estado", "comentario"? }` | RN-24, 25 |
+| `GET` | `/api/huespedes?q=texto` | Busca por nombre, correo, teléfono o documento | — |
+| `POST` | `/api/huespedes` | Registra un huésped | RN-30 a RN-33 |
+| `GET` | `/api/huespedes/:id` | Consulta un huésped (documento oculto) | RN-34 |
+| `PATCH` | `/api/huespedes/:id` | Edita los datos de un huésped | RN-31 a RN-33 |
 | `GET` | `/api/explorador/tablas` | Lista las tablas de la BD (página en `http://localhost:3000`) | — |
 
 Ejemplo:
@@ -120,7 +131,7 @@ curl -X POST http://localhost:3000/api/reservaciones -H 'Content-Type: applicati
   "huespedId": "b0000000-0000-0000-0000-000000000001",
   "habitacionId": "<id de una habitación>",
   "entrada": "2026-12-20", "salida": "2026-12-22",
-  "numAdultos": 2, "numNinos": 0, "precioNoche": 1100
+  "numAdultos": 2, "numNinos": 0
 }'
 ```
 

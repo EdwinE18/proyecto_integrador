@@ -125,6 +125,16 @@ BEGIN
   PERFORM pg_temp.debe_fallar('RN-23', 'No se borra un huésped que tiene reservaciones',
     format('DELETE FROM huespedes WHERE id = %L', c.lucas));
 
+  -- RN-32 y RN-33 requieren database/07_reglas_huespedes.sql
+  PERFORM pg_temp.debe_fallar('RN-32', 'Un huésped necesita correo o teléfono',
+    'INSERT INTO huespedes (nombre, apellidos) VALUES (''Sin'', ''Contacto'')');
+  PERFORM pg_temp.debe_fallar('RN-32', 'Un correo vacío no cuenta como contacto',
+    'INSERT INTO huespedes (nombre, apellidos, email) VALUES (''Sin'', ''Contacto'', ''   '')');
+  PERFORM pg_temp.debe_pasar('RN-32', 'Con teléfono es suficiente',
+    'INSERT INTO huespedes (nombre, apellidos, telefono) VALUES (''Con'', ''Telefono'', ''9611112233'')');
+  PERFORM pg_temp.debe_fallar('RN-33', 'No se guarda un número de documento sin su tipo',
+    'INSERT INTO huespedes (nombre, apellidos, telefono, num_documento) VALUES (''Doc'', ''Incompleto'', ''9611112233'', ''ABC123'')');
+
   PERFORM pg_temp.debe_fallar('RN-30', 'No se repite un documento de identidad',
     'INSERT INTO huespedes (nombre, apellidos, tipo_documento, num_documento) VALUES (''Otra'', ''Persona'', ''INE'', ''MADA900101MDF'')');
 

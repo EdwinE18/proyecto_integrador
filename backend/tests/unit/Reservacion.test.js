@@ -2,16 +2,17 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { Reservacion } from '../../src/modules/reservaciones/domain/entities/Reservacion.js';
 import { CrearReservacion } from '../../src/modules/reservaciones/application/use-cases/CrearReservacion.js';
+import { Dinero } from '../../src/modules/pagos/domain/value-objects/Dinero.js';
 
 const datos = { hotelId: 'h1', huespedId: 'g', habitacionId: 'r', entrada: '2026-12-01', salida: '2026-12-04',
                 numAdultos: 2, numNinos: 0, precioNoche: 1000 };
 
 // Habitación doble en buen estado (se cambia por prueba)
 const habitacion = { id: 'r', hotelId: 'h1', numero: '201', estado: 'disponible', activo: true,
-                     capacidadAdultos: 2, capacidadNinos: 1 };
+                     tipoId: 't1', capacidadAdultos: 2, capacidadNinos: 1, precioBase: Dinero.dePesos(1000) };
 
 // Arma el caso de uso con adaptadores falsos: no necesita base de datos
-function crearCaso({ hab = habitacion, libre = true, hoy = '2026-11-15' } = {}) {
+function crearCaso({ hab = habitacion, libre = true, hoy = '2026-11-15', temporadas = [] } = {}) {
   const llamadas = { guardar: 0, eventos: [] };
   const uc = new CrearReservacion({
     reservacionRepository: {
@@ -19,6 +20,7 @@ function crearCaso({ hab = habitacion, libre = true, hoy = '2026-11-15' } = {}) 
       guardar: async (r) => { llamadas.guardar++; r.id = 'nuevo'; r.codigo = 'ABC12345'; return r; },
     },
     habitacionReader: { obtenerParaReservar: async () => hab },
+    tarifaReader: { temporadas: async () => temporadas },
     reloj: { hoy: () => hoy },
     eventPublisher: { publicar: async (tipo) => { llamadas.eventos.push(tipo); } },
   });
@@ -103,5 +105,20 @@ describe('Caso de uso CrearReservacion', () => {
   test('RN-14 permite reservar para hoy mismo', async () => {
     const { uc } = crearCaso({ hoy: '2026-12-01' });
     await uc.ejecutar(datos);
+  });
+
+  test('RN-61 ignora el precio que manda el cliente', async () => {
+    const { uc } = crearCaso();
+    const r = await uc.ejecutar({ ...datos, precioNoche: 1, total: 3 });
+    assert.equal(r.precioNoche, 1000);
+    assert.equal(r.total, 3000);
+  });
+
+  test('RN-61 usa la tarifa de temporada en las noches que le tocan', async () => {
+    const navidad = { nombre: 'Navidad', inicio: '2026-12-02', fin: '2027-01-02', precio: Dinero.dePesos(1500) };
+    const { uc } = crearCaso({ temporadas: [navidad] });
+    const r = await uc.ejecutar(datos);      // 1→4 dic: noche 1 base, noches 2 y 3 Navidad
+    assert.equal(r.total, 4000);             // 1000 + 1500 + 1500
+    assert.deepEqual(r.cotizacion.noches.map((n) => n.temporada), [null, 'Navidad', 'Navidad']);
   });
 });

@@ -20,6 +20,9 @@ export const aRespuesta = (r) => ({
   estado: r.estado,
   canal: r.canal,
   motivoCancelacion: r.motivoCancelacion,
+  ...(r.cotizacion && {
+    desglose: r.cotizacion.noches.map((n) => ({ fecha: n.fecha, precio: n.precio.pesos, temporada: n.temporada })),
+  }),
 });
 
 export const reservacionRoutes = ({

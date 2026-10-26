@@ -6,7 +6,7 @@ import { HabitacionNoDisponibleError, ReservacionError } from '../../domain/erro
 const aEntidad = (r) => new Reservacion({
   id: r.id, codigo: r.codigo, hotelId: r.hotel_id, huespedId: r.huesped_id,
   habitacionId: r.habitacion_id, entrada: r.fecha_entrada, salida: r.fecha_salida,
-  numAdultos: r.num_adultos, numNinos: r.num_ninos, precioNoche: r.precio_noche,
+  numAdultos: r.num_adultos, numNinos: r.num_ninos, precioNoche: r.precio_noche, total: r.total,
   estado: r.estado, canal: r.canal, motivoCancelacion: r.motivo_cancelacion, creadaEn: r.created_at,
 });
 

@@ -11,7 +11,7 @@ const MIN_LARGO_MOTIVO = 5;
 
 export class Reservacion {
   constructor({ id, codigo, hotelId, huespedId, habitacionId, entrada, salida,
-                numAdultos = 1, numNinos = 0, precioNoche, estado = 'pendiente', canal = 'mostrador',
+                numAdultos = 1, numNinos = 0, precioNoche = 0, total = null, estado = 'pendiente', canal = 'mostrador',
                 motivoCancelacion = null, creadaEn = null }) {
     this.id = id;
     this.codigo = codigo;
@@ -22,6 +22,7 @@ export class Reservacion {
     this.numAdultos = Number(numAdultos);
     this.numNinos = Number(numNinos);
     this.precioNoche = Number(precioNoche);
+    this._total = total === null || total === undefined ? null : Number(total);
     this.estado = estado;
     this.canal = canal;
     this.motivoCancelacion = motivoCancelacion;
@@ -32,7 +33,14 @@ export class Reservacion {
       throw new ReservacionError('El número de niños no puede ser negativo', 'RN-05');
   }
 
-  get total() { return this.rango.noches * this.precioNoche; }
+  /** RN-06: total guardado (viene de la cotización) o noches × precio por noche */
+  get total() { return this._total ?? this.rango.noches * this.precioNoche; }
+
+  /** RN-61: el precio lo pone el sistema con la cotización, nunca el cliente */
+  aplicarCotizacion({ total, promedioNoche }) {
+    this.precioNoche = promedioNoche.pesos;
+    this._total = total.pesos;
+  }
 
   /** RN-14: la entrada no puede ser antes de hoy. @param {string} hoy 'YYYY-MM-DD' */
   validarFechaNoPasada(hoy) {

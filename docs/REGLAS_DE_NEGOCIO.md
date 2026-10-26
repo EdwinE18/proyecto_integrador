@@ -27,14 +27,14 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Módulo | ✅ | 🟡 | ⬜ | ❓ |
 |---|---|---|---|---|
 | Reservaciones | 14 | 0 | 0 | 1 |
-| Habitaciones | 4 | 0 | 0 | 0 |
-| Huéspedes | 1 | 0 | 0 | 0 |
+| Habitaciones | 6 | 0 | 0 | 0 |
+| Huéspedes | 5 | 0 | 0 | 0 |
 | Estancias (check-in / check-out) | 7 | 0 | 0 | 0 |
 | Pagos | 6 | 0 | 0 | 1 |
-| Tarifas | 1 | 0 | 1 | 0 |
+| Tarifas | 2 | 0 | 0 | 0 |
 | Usuarios y seguridad | 1 | 0 | 2 | 0 |
 | Automatización y notificaciones | 1 | 0 | 2 | 1 |
-| **Total** | **35** | **0** | **5** | **3** |
+| **Total** | **42** | **0** | **4** | **3** |
 
 ---
 
@@ -70,9 +70,10 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Dónde se aplica:** BD (`CHECK`).
 
 ### RN-06 · El número de noches y el total se calculan solos ✅
-- **Regla:** `noches = fecha_salida − fecha_entrada` y `total = noches × precio_noche`. Nadie los captura a mano.
-- **Dónde se aplica:** BD (`noches` es una columna generada) y dominio (`Reservacion.total`).
-- **Cómo validarlo:** prueba unitaria `calcula noches y total`.
+- **Regla:** `noches = fecha_salida − fecha_entrada` y `total = suma del precio de cada noche`. Nadie los captura a mano.
+- Como cada noche puede tener distinto precio (ver RN-61), `precio_noche` guarda el **promedio** y `total` la suma exacta.
+- **Dónde se aplica:** BD (`noches` es una columna generada) y dominio (servicio `Tarifador`).
+- **Cómo validarlo:** pruebas `Tarifador.test.js` y `calcula noches y total`.
 
 ### RN-07 · Cada reservación tiene un código único ✅
 - **Regla:** se genera automáticamente un código de 8 caracteres (ej. `3C8007D9`) para que el huésped lo dé al llegar o por Telegram.
@@ -143,13 +144,50 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Regla:** se protege el historial. En lugar de borrar, se marca `activo = false`.
 - **Dónde se aplica:** BD (`ON DELETE RESTRICT`).
 
+### RN-24 · Los cambios de estado de una habitación siguen un orden ✅ *(nueva)*
+- **Regla:** cambios que se pueden hacer a mano:
+
+  | De ↓ / A → | disponible | limpieza | mantenimiento | fuera_servicio |
+  |---|---|---|---|---|
+  | **disponible** | — | ✔ | ✔ | ✔ |
+  | **limpieza** | ✔ | — | ✔ | ✘ |
+  | **mantenimiento** | ✔ | ✔ | — | ✔ |
+  | **fuera_servicio** | ✔ | ✘ | ✔ | — |
+
+  El estado `ocupada` **nunca** se pone ni se quita a mano: solo con check-in y check-out. Así el tablero siempre coincide con los huéspedes reales.
+- **Dónde se aplica:** dominio (`Habitacion.cambiarEstado()`) + adaptador (`UPDATE ... WHERE estado = <anterior>`, que evita pisar el cambio de otra persona).
+- **Ruta:** `PATCH /api/habitaciones/:id/estado` con `{ "estado": "disponible", "comentario": "..." }`. Así limpieza marca un cuarto como listo después del check-out.
+
+### RN-25 · Sacar una habitación de servicio requiere explicar por qué ✅ *(nueva)*
+- **Regla:** para pasar a `mantenimiento` o `fuera_servicio` el comentario es obligatorio, y queda en `historial_habitacion`. La respuesta incluye las **reservaciones próximas que hay que reubicar**.
+- **Dónde se aplica:** caso de uso `CambiarEstadoHabitacion`.
+
 ---
 
 ## 3. Huéspedes
 
 ### RN-30 · Un documento de identidad pertenece a un solo huésped ✅
 - **Regla:** no se repite la combinación tipo de documento + número (INE o pasaporte), para evitar huéspedes duplicados.
-- **Dónde se aplica:** BD (`UNIQUE (tipo_documento, num_documento)`).
+- **Dónde se aplica:** BD (`UNIQUE (tipo_documento, num_documento)`). El adaptador lo traduce a HTTP 409 *"Ya existe un huésped con ese documento"*.
+
+### RN-31 · Nombre y apellidos son obligatorios y se guardan bien escritos ✅ *(nueva)*
+- **Regla:** `"  maRÍA   josé "` se guarda como `"María José"`.
+- **Dónde se aplica:** dominio (`Huesped`) + BD (trigger `trg_normalizar_huesped` de `04_funciones_cadena.sql`).
+
+### RN-32 · Todo huésped tiene al menos un medio de contacto válido ✅ *(nueva)*
+- **Regla:** correo o teléfono (o los dos), porque sin contacto no se puede confirmar la reservación. El correo debe tener formato válido y el teléfono entre 10 y 15 dígitos (se aceptan internacionales con `+`).
+- **Dónde se aplica:** dominio (`Huesped`) + BD (restricción `rn32_contacto` en `07_reglas_huespedes.sql`).
+
+### RN-33 · El documento se registra completo o no se registra ✅ *(nueva)*
+- **Regla:** tipo y número van juntos. Tipos válidos: `INE`, `pasaporte`, `licencia`, `otro`. El número se guarda en mayúsculas y sin espacios ni guiones.
+- **Dónde se aplica:** dominio + BD (restricción `rn33_documento_completo`).
+
+### RN-34 · El documento completo nunca se envía al navegador ✅ *(nueva)*
+- **Regla:** la API responde `"******0101"`. El número completo solo vive en la base de datos (protección de datos personales).
+- **Dónde se aplica:** adaptador HTTP (`huesped.routes.js`).
+
+### Búsqueda de huéspedes
+`GET /api/huespedes?q=pérez` busca por nombre completo, correo, documento o teléfono, usando funciones de cadena (`CONCAT`, `ILIKE`). Los valores van como parámetros `$1`, nunca pegados al SQL, para evitar inyección SQL.
 
 ---
 
@@ -229,8 +267,11 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Regla:** no puede haber dos tarifas de temporada para el mismo tipo de habitación con fechas que se traslapen.
 - **Dónde se aplica:** BD (`EXCLUDE USING gist` en `tarifas_temporada`).
 
-### RN-61 · La tarifa de temporada reemplaza al precio base ⬜
-- **Regla:** al crear la reservación, si la fecha cae en una temporada (ej. Semana Santa) se usa `precio_noche` de la temporada; si no, el `precio_base` del tipo.
+### RN-61 · El precio lo calcula el sistema, noche por noche ✅
+- **Regla:** cada noche cobra la tarifa de temporada que la cubre; si no hay, el `precio_base` del tipo de habitación. **Cualquier precio que mande el cliente se ignora**: si no, alguien podría reservar a $1 la noche.
+- **Ejemplo:** 18→22 dic en Doble chimenea, con Navidad desde el 20: 1100 + 1100 + 1500 + 1500 = **$5,200**.
+- **Dónde se aplica:** servicio de dominio `Tarifador` (`reservaciones/domain/services`), usado por `CrearReservacion` y por la búsqueda de disponibilidad. Las temporadas llegan por el puerto `TarifaReader`.
+- **Rutas:** `GET /api/hoteles/:hotelId/disponibilidad?entrada=&salida=&adultos=&ninos=` devuelve los cuartos libres con su total y su desglose. `POST /api/reservaciones` también regresa el desglose.
 
 ---
 
@@ -277,9 +318,9 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ```bash
 cd backend && npm test
 ```
-Son 72 pruebas. Cubren las reglas de reservaciones, pagos y estancias usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
+Son 107 pruebas. Cubren las reglas de reservaciones, precios, huéspedes, habitaciones, pagos y estancias usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
 
-**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55 y RN-60 (40 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de `05_reglas_reservacion.sql` y `06_reglas_estancias_pagos.sql`:
+**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55 y RN-60 (44 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de los archivos `05`, `06` y `07`:
 ```bash
 psql -h localhost -U pms_admin -d hotel_pms < database/03_validar_reglas.sql 2>&1 | sed 's/NOTICE:  //'
 ```
@@ -301,3 +342,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 | 2026-10-26 | RN-11, RN-13 y RN-14 implementadas en el dominio (+ RN-11 y RN-13 en la BD) | Edwin |
 | 2026-10-26 | RN-09, RN-10 y RN-12: confirmar y cancelar con motivo (+ RN-12 en la BD). Corregido error que guardaba las fechas un día antes | Edwin |
 | 2026-10-26 | Módulos de pagos y estancias: check-in, check-out, pagos y saldo (RN-42, 43, 52 + nuevas RN-44, 45, 46, 54, 55, 56). Total: 43 reglas | Edwin |
+| 2026-10-26 | Huéspedes, habitaciones, hoteles y precio automático (RN-61 + nuevas RN-24, 25, 31, 32, 33, 34). Total: 49 reglas | Edwin |
