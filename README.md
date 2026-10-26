@@ -22,10 +22,12 @@ cd ../backend && cp .env.example .env && npm install
 npm test          # pruebas del dominio (no necesitan BD)
 npm run dev       # API en http://localhost:3000/api/health
 
-# Frontend
-cd .. && npm create vite@latest frontend -- --template react   # elige "Ignore files and continue"
-cd frontend && npm install && npm run dev
+# Frontend (en OTRA terminal, con el backend corriendo)
+cd frontend && npm install
+npm run dev       # abre http://localhost:5173  (usuarios de prueba abajo, contraseña Demo1234)
 ```
+
+El frontend reenvía todo lo que empieza con `/api` al backend en el puerto 3000 (configurado en `frontend/vite.config.js`), así que no hay problemas de CORS.
 
 > `crear_estructura.sh` genera solo las carpetas desde cero, por si quieres rehacer la estructura en otra ruta.
 
@@ -81,11 +83,18 @@ hotel-pms/
 │   │   └── server.js
 │   ├── tests/unit  tests/integration
 │   └── package.json  .env.example
-├── frontend/src/
-│   ├── domain/models                      # tipos: Reservacion, Habitacion...
-│   ├── application/{hooks,services}       # useReservaciones(), lógica de pantalla
-│   ├── infrastructure/{api,storage}       # cliente HTTP (fetch/axios), token
-│   └── ui/{components,pages,layouts,routes,styles}
+├── frontend/src/                          # React + Vite (hexagonal ligero)
+│   ├── domain/                            # estados.js (textos, colores, cambios válidos), formato.js (dinero, fechas)
+│   ├── application/                       # SesionContext (usuario, permisos, hotel) · hooks useConsulta / useAccion
+│   ├── infrastructure/
+│   │   ├── api/                           # cliente.js (fetch + token) · pmsApi.js (todas las rutas)
+│   │   └── storage/                       # sesión en sessionStorage
+│   └── ui/
+│       ├── pages/                         # Login, Tablero, NuevaReservacion, Reservaciones, DetalleReservacion,
+│       │                                  # Habitaciones, Huespedes, Usuarios, MiCuenta
+│       ├── components/                    # Aviso (muestra la regla RN-xx), Modal, FormHuesped, check-in/cobro/cancelar
+│       ├── layouts/AppLayout.jsx          # menú lateral: cada opción aparece solo si el rol tiene permiso
+│       └── styles/global.css
 ├── automation/
 │   ├── n8n/workflows                      # exporta aquí los .json de n8n
 │   ├── node-red/flows                     # flows.json de Node-RED
@@ -150,6 +159,8 @@ Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuest
 | `GET` | `/api/hoteles` | Hoteles con su ocupación de hoy | — |
 | `GET` | `/api/hoteles/:hotelId/habitaciones` | Habitaciones del hotel con estado, tipo y precio base | — |
 | `GET` | `/api/hoteles/:hotelId/disponibilidad?entrada=&salida=&adultos=&ninos=` | Cuartos libres con total y desglose por noche | RN-01, 11, 13, 14, 61 |
+| `GET` | `/api/hoteles/:hotelId/agenda?desde=&hasta=&estados=` | Reservaciones con huésped, cuarto y saldo (para el tablero) | — |
+| `GET` | `/api/reservaciones/:id/detalle` | Reservación con huésped, cuarto, saldo y estancia | — |
 | `PATCH` | `/api/habitaciones/:id/estado` | Cambia el estado. Cuerpo: `{ "estado", "comentario"? }` | RN-24, 25 |
 | `GET` | `/api/huespedes?q=texto` | Busca por nombre, correo, teléfono o documento | — |
 | `POST` | `/api/huespedes` | Registra un huésped | RN-30 a RN-33 |

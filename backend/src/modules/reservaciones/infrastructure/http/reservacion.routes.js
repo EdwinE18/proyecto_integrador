@@ -26,7 +26,7 @@ export const aRespuesta = (r) => ({
 });
 
 export const reservacionRoutes = ({
-  crearReservacion, listarReservaciones, obtenerReservacion, confirmarReservacion, cancelarReservacion,
+  crearReservacion, listarReservaciones, obtenerReservacion, confirmarReservacion, cancelarReservacion, consultarAgenda,
 }) => {
   const router = Router();
 
@@ -46,6 +46,11 @@ export const reservacionRoutes = ({
     } catch (e) { next(e); }
   });
 
+  // Detalle con huésped, habitación, saldo y estancia (para la pantalla de la reservación)
+  router.get('/:id/detalle', async (req, res, next) => {
+    try { res.json(await consultarAgenda.detalle(req.params.id)); } catch (e) { next(e); }
+  });
+
   router.get('/:id', async (req, res, next) => {
     try { res.json(aRespuesta(await obtenerReservacion.ejecutar(req.params.id))); }
     catch (e) { next(e); }
@@ -63,5 +68,14 @@ export const reservacionRoutes = ({
     catch (e) { next(e); }
   });
 
+  return router;
+};
+
+// /api/hoteles/:hotelId/agenda?desde=&hasta=&estados=confirmada,check_in
+export const agendaRoutes = ({ consultarAgenda }) => {
+  const router = Router({ mergeParams: true });
+  router.get('/agenda', async (req, res, next) => {
+    try { res.json(await consultarAgenda.ejecutar(req.params.hotelId, req.query)); } catch (e) { next(e); }
+  });
   return router;
 };

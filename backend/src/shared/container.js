@@ -13,6 +13,8 @@ import { ListarReservaciones } from '../modules/reservaciones/application/use-ca
 import { ObtenerReservacion } from '../modules/reservaciones/application/use-cases/ObtenerReservacion.js';
 import { ConfirmarReservacion } from '../modules/reservaciones/application/use-cases/ConfirmarReservacion.js';
 import { CancelarReservacion } from '../modules/reservaciones/application/use-cases/CancelarReservacion.js';
+import { ConsultarAgenda } from '../modules/reservaciones/application/use-cases/ConsultarAgenda.js';
+import { PostgresReservacionConsultas } from '../modules/reservaciones/infrastructure/persistence/PostgresReservacionConsultas.js';
 
 // Pagos
 import { PostgresPagoRepository } from '../modules/pagos/infrastructure/persistence/PostgresPagoRepository.js';
@@ -62,6 +64,7 @@ const eventPublisher = new PostgresOutboxPublisher(pool);
 const reservacionRepository = new PostgresReservacionRepository(pool);
 const habitacionReader = new PostgresHabitacionReader(pool);
 const tarifaReader = new PostgresTarifaReader(pool);
+const reservacionConsultas = new PostgresReservacionConsultas(pool);
 const huespedRepository = new PostgresHuespedRepository(pool);
 const hotelRepository = new PostgresHotelRepository(pool);
 const habitacionRepository = new PostgresHabitacionRepository(pool);
@@ -83,6 +86,7 @@ export const container = {
   obtenerReservacion: new ObtenerReservacion({ reservacionRepository }),
   confirmarReservacion: new ConfirmarReservacion({ reservacionRepository, eventPublisher }),
   cancelarReservacion: new CancelarReservacion({ reservacionRepository, eventPublisher }),
+  consultarAgenda: new ConsultarAgenda({ reservacionConsultas, reloj }),
 
   registrarPago: new RegistrarPago({ pagoRepository, eventPublisher }),
   consultarCuenta: new ConsultarCuenta({ pagoRepository }),

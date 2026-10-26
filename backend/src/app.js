@@ -7,7 +7,7 @@ import { validarUUID } from './shared/infrastructure/http/middlewares/validarUUI
 import { errorHandler } from './shared/infrastructure/http/middlewares/errorHandler.js';
 import { autenticar, permitir, soloSuHotel } from './modules/usuarios/infrastructure/http/auth.middleware.js';
 import { authRoutes, usuarioRoutes } from './modules/usuarios/infrastructure/http/auth.routes.js';
-import { reservacionRoutes } from './modules/reservaciones/infrastructure/http/reservacion.routes.js';
+import { reservacionRoutes, agendaRoutes } from './modules/reservaciones/infrastructure/http/reservacion.routes.js';
 import { pagoRoutes } from './modules/pagos/infrastructure/http/pago.routes.js';
 import { estanciaRoutes } from './modules/estancias/infrastructure/http/estancia.routes.js';
 import { huespedRoutes } from './modules/huespedes/infrastructure/http/huesped.routes.js';
@@ -37,9 +37,9 @@ app.use('/api/usuarios', usuarioRoutes(container));
 // Hoteles y habitaciones                                   RN-72 permiso   ·  RN-75 su hotel
 app.use('/api/hoteles', permitir('habitaciones:ver'));
 app.use('/api/hoteles/:hotelId', validarUUID('hotelId', 'El hotel no existe'), soloSuHotel((r) => r.params.hotelId));
-app.get('/api/hoteles/:hotelId/disponibilidad', permitir('reservaciones:gestionar'));
+app.get(['/api/hoteles/:hotelId/disponibilidad', '/api/hoteles/:hotelId/agenda'], permitir('reservaciones:gestionar'));
 app.use('/api/hoteles', hotelRoutes(container));
-app.use('/api/hoteles/:hotelId', habitacionesDeHotelRoutes(container));
+app.use('/api/hoteles/:hotelId', habitacionesDeHotelRoutes(container), agendaRoutes(container));
 app.use('/api/habitaciones/:id', validarUUID('id', 'La habitación no existe'), permitir('habitaciones:ver'),
   soloSuHotel((r) => hotelDeRecurso.deHabitacion(r.params.id)));
 app.use('/api/habitaciones', habitacionRoutes(container));   // el caso de uso revisa limpieza vs. servicio
