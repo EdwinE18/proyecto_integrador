@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useSesion } from '../../application/SesionContext.jsx';
-import { useAccion } from '../../application/hooks/useAccion.js';
+import { useSesion } from '../context/SesionContext.jsx';
+import { useAccion } from '../hooks/useAccion.js';
 import { Aviso, Boton, Campo } from '../components/comunes.jsx';
 
 const DEMO = ['recepcion@losarcos.mx', 'limpieza@losarcos.mx', 'gerente@boutiquecanon.mx', 'admin@pms.local'];

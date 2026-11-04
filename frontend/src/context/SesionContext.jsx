@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { pmsApi } from '../infrastructure/api/pmsApi.js';
-import { configurarCliente } from '../infrastructure/api/cliente.js';
-import { sesionStorage } from '../infrastructure/storage/sesionStorage.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { configurarCliente } from '../services/cliente.js';
+import { sesionStorage } from '../services/sesionStorage.js';
 
 const SesionContext = createContext(null);
 

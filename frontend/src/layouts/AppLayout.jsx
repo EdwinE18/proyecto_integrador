@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useSesion } from '../../application/SesionContext.jsx';
-import { ROLES } from '../../domain/estados.js';
+import { useSesion } from '../context/SesionContext.jsx';
+import { ROLES } from '../utils/estados.js';
 
 // Cada opción del menú aparece solo si el rol tiene el permiso (RN-72)
 const MENU = [

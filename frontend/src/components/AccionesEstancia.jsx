@@ -1,9 +1,9 @@
 // Ventanas para check-in, cancelar y cobrar. Se usan en el tablero y en el detalle.
 import { useState } from 'react';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { useAccion } from '../../application/hooks/useAccion.js';
-import { METODOS_PAGO } from '../../domain/estados.js';
-import { dinero } from '../../domain/formato.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { useAccion } from '../hooks/useAccion.js';
+import { METODOS_PAGO } from '../utils/estados.js';
+import { dinero } from '../utils/formato.js';
 import { Aviso, Boton, Campo, Modal } from './comunes.jsx';
 
 export function ModalCheckIn({ reservacion, alCerrar, alTerminar }) {

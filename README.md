@@ -2,7 +2,7 @@
 
 Sistema de administración hotelera: reservaciones, registro de huéspedes, asignación de cuartos y control de ocupación, para posadas y hoteles boutique de Tuxtla y San Cristóbal.
 
-**Stack:** React (Vite) · Node.js (Express) · PostgreSQL · n8n · Node-RED · Telegram Bot · Ejecución local (Ubuntu / WSL)
+**Stack:** React (Vite) · Node.js (Express) · PostgreSQL · n8n · Node-RED · Telegram Bot · AWS (EC2 + RDS)
 **Arquitectura:** Hexagonal (Puertos y Adaptadores) en el backend · Basada en componentes en el frontend
 
 ---
@@ -50,7 +50,7 @@ El frontend reenvía todo lo que empieza con `/api` al backend en el puerto 3000
                           └─────────────────────────┘
 ```
 
-**Regla de oro:** las dependencias apuntan hacia adentro. El dominio no importa Express, `pg` ni Telegram. Solo `shared/container.js` conecta adaptadores con puertos, así que puedes cambiar PostgreSQL local por una base en la nube (o por un repositorio falso en pruebas) sin tocar las reglas de negocio.
+**Regla de oro:** las dependencias apuntan hacia adentro. El dominio no importa Express, `pg` ni Telegram. Solo `shared/container.js` conecta adaptadores con puertos, así que puedes cambiar PostgreSQL local por RDS (o por un repositorio falso en pruebas) sin tocar las reglas de negocio.
 
 ### Estructura
 
@@ -100,6 +100,7 @@ hotel-pms/
 │   ├── node-red/flows                     # flows.json de Node-RED
 │   └── telegram-bot/src
 ├── database/  01_schema.sql  02_seed.sql  setup_db.sh  migrations/
+├── infra/{aws,nginx}
 └── docs/{diagramas,investigacion}
 ```
 
@@ -136,7 +137,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/hoteles
 
 Respuestas de seguridad: **401** sin sesión o sesión vencida (RN-71) · **403** sin permiso para esa acción (RN-72) o de otro hotel (RN-75) · **429** demasiados intentos (RN-74).
 
-> ⚠️ Antes de usarlo en un hotel real cambia `JWT_SECRET` en `backend/.env` por uno propio: `openssl rand -hex 32`
+> ⚠️ Antes de subir a AWS cambia `JWT_SECRET` en `backend/.env` por uno propio: `openssl rand -hex 32`
 
 ---
 
@@ -225,27 +226,7 @@ eventos_dominio 1─N notificaciones
 2. **n8n** (nodo Postgres cada minuto, o webhook) lee eventos con `procesado = false`, envía la confirmación al huésped por **Telegram** y marca el evento como procesado.
 3. **Node-RED** genera el reporte diario de ocupación (`v_ocupacion_hoy`) y avisa a recepción las llegadas del día.
 
-## 5. Ejecución local y demostración
+## 5. Despliegue en AWS
 
-El sistema se entrega para correr en una computadora con Ubuntu (o Windows con WSL). Se abren **dos terminales**:
-
-```bash
-# Terminal 1 — base de datos y backend (API en http://localhost:3000)
-sudo service postgresql start
-cd ~/proyectoI/hotel-pms/backend && npm run dev
-
-# Terminal 2 — frontend (abre http://localhost:5173)
-cd ~/proyectoI/hotel-pms/frontend && npm run dev
-```
-
-### Mostrarlo desde otro dispositivo (opcional)
-
-Con **Cloudflare Tunnel** se obtiene un enlace público temporal sin pagar ni configurar un servidor. Sirve para abrir el sistema desde un celular durante la presentación y para que Telegram pueda comunicarse con el sistema local.
-
-```bash
-# Terminal 3 (con los otros dos corriendo)
-cloudflared tunnel --url http://localhost:5173
-# → muestra un enlace como https://palabras-al-azar.trycloudflare.com
-```
-
-El enlace cambia cada vez que se ejecuta el comando y deja de funcionar al cerrarlo.
+- **RDS PostgreSQL:** ejecuta `01_schema.sql` con el usuario maestro (las extensiones `btree_gist`, `pgcrypto` y `citext` están permitidas en RDS).
+- **EC2 (Ubuntu):** backend con `pm2`, frontend compilado (`npm run build`) servido por Nginx (`infra/nginx`), n8n y Node-RED en Docker.

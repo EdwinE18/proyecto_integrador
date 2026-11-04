@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TIPOS_DOCUMENTO } from '../../domain/estados.js';
+import { TIPOS_DOCUMENTO } from '../utils/estados.js';
 import { Campo } from './comunes.jsx';
 
 export const HUESPED_VACIO = { nombre: '', apellidos: '', telefono: '', email: '', tipoDocumento: '', numDocumento: '', ciudadOrigen: '', notas: '' };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { useAccion } from '../../application/hooks/useAccion.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { useAccion } from '../hooks/useAccion.js';
 import { Aviso, Boton, Campo, Encabezado, Modal, Vacio } from '../components/comunes.jsx';
 import { FormHuesped } from '../components/FormHuesped.jsx';
 

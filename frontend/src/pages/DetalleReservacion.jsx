@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { useConsulta } from '../../application/hooks/useConsulta.js';
-import { useAccion } from '../../application/hooks/useAccion.js';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { CANALES, METODOS_PAGO } from '../../domain/estados.js';
-import { dinero, fechaHora, fechaLarga, plural } from '../../domain/formato.js';
+import { useConsulta } from '../hooks/useConsulta.js';
+import { useAccion } from '../hooks/useAccion.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { CANALES, METODOS_PAGO } from '../utils/estados.js';
+import { dinero, fechaHora, fechaLarga, plural } from '../utils/formato.js';
 import { Aviso, Boton, Cargando, Encabezado, EstadoReservacion, Vacio } from '../components/comunes.jsx';
 import { ModalCancelar, ModalCheckIn, ModalPago } from '../components/AccionesEstancia.jsx';
 

@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { SesionProvider, useSesion } from '../application/SesionContext.jsx';
+import { SesionProvider, useSesion } from './context/SesionContext.jsx';
 import { AppLayout } from './layouts/AppLayout.jsx';
 import Login from './pages/Login.jsx';
 import Tablero from './pages/Tablero.jsx';

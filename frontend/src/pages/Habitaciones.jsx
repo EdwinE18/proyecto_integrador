@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useSesion } from '../../application/SesionContext.jsx';
-import { useConsulta } from '../../application/hooks/useConsulta.js';
-import { useAccion } from '../../application/hooks/useAccion.js';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { CAMBIOS_HABITACION, ESTADOS_HABITACION, requiereServicio } from '../../domain/estados.js';
-import { dinero } from '../../domain/formato.js';
+import { useSesion } from '../context/SesionContext.jsx';
+import { useConsulta } from '../hooks/useConsulta.js';
+import { useAccion } from '../hooks/useAccion.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { CAMBIOS_HABITACION, ESTADOS_HABITACION, requiereServicio } from '../utils/estados.js';
+import { dinero } from '../utils/formato.js';
 import { Aviso, Boton, Campo, Cargando, Encabezado, EstadoHabitacion, Modal, Vacio } from '../components/comunes.jsx';
 
 // Texto del botón según el cambio

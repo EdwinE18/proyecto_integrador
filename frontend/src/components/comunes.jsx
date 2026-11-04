@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ESTADOS_HABITACION, ESTADOS_RESERVACION } from '../../domain/estados.js';
+import { ESTADOS_HABITACION, ESTADOS_RESERVACION } from '../utils/estados.js';
 
 export const Chip = ({ tono = 'gris', children }) => <span className={`chip ${tono}`}>{children}</span>;
 

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSesion } from '../../application/SesionContext.jsx';
-import { useConsulta } from '../../application/hooks/useConsulta.js';
-import { useAccion } from '../../application/hooks/useAccion.js';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { ESTADOS_HABITACION } from '../../domain/estados.js';
-import { dinero, fechaLarga, fechaCorta, hoyISO, plural, sumarDias } from '../../domain/formato.js';
+import { useSesion } from '../context/SesionContext.jsx';
+import { useConsulta } from '../hooks/useConsulta.js';
+import { useAccion } from '../hooks/useAccion.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { ESTADOS_HABITACION } from '../utils/estados.js';
+import { dinero, fechaLarga, fechaCorta, hoyISO, plural, sumarDias } from '../utils/formato.js';
 import { Aviso, Boton, Cargando, Encabezado, EstadoReservacion, Vacio } from '../components/comunes.jsx';
 import { ModalCheckIn } from '../components/AccionesEstancia.jsx';
 

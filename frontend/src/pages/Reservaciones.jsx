@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSesion } from '../../application/SesionContext.jsx';
-import { useConsulta } from '../../application/hooks/useConsulta.js';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { ESTADOS_RESERVACION, CANALES } from '../../domain/estados.js';
-import { dinero, fechaCorta, hoyISO, sumarDias } from '../../domain/formato.js';
+import { useSesion } from '../context/SesionContext.jsx';
+import { useConsulta } from '../hooks/useConsulta.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { ESTADOS_RESERVACION, CANALES } from '../utils/estados.js';
+import { dinero, fechaCorta, hoyISO, sumarDias } from '../utils/formato.js';
 import { Aviso, Campo, Cargando, Encabezado, EstadoReservacion, Vacio } from '../components/comunes.jsx';
 
 const ACTIVAS = ['pendiente', 'confirmada', 'check_in'];

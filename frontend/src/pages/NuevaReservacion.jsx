@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSesion } from '../../application/SesionContext.jsx';
-import { useAccion } from '../../application/hooks/useAccion.js';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { CANALES } from '../../domain/estados.js';
-import { dinero, fechaCorta, fechaLarga, hoyISO, plural, sumarDias } from '../../domain/formato.js';
+import { useSesion } from '../context/SesionContext.jsx';
+import { useAccion } from '../hooks/useAccion.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { CANALES } from '../utils/estados.js';
+import { dinero, fechaCorta, fechaLarga, hoyISO, plural, sumarDias } from '../utils/formato.js';
 import { Aviso, Boton, Campo, Encabezado, Vacio } from '../components/comunes.jsx';
 import { FormHuesped } from '../components/FormHuesped.jsx';
 

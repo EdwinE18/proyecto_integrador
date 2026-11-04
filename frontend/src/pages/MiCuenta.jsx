@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useSesion } from '../../application/SesionContext.jsx';
-import { useAccion } from '../../application/hooks/useAccion.js';
-import { pmsApi } from '../../infrastructure/api/pmsApi.js';
-import { ROLES } from '../../domain/estados.js';
+import { useSesion } from '../context/SesionContext.jsx';
+import { useAccion } from '../hooks/useAccion.js';
+import { pmsApi } from '../services/pmsApi.js';
+import { ROLES } from '../utils/estados.js';
 import { Aviso, Boton, Campo, Encabezado } from '../components/comunes.jsx';
 
 export default function MiCuenta() {
