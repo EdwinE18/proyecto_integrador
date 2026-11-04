@@ -4,7 +4,7 @@ const SELECT = `
   SELECT r.id, r.codigo, r.hotel_id, r.estado, r.canal, r.fecha_entrada, r.fecha_salida, r.noches,
          r.num_adultos, r.num_ninos, r.precio_noche, r.total, r.motivo_cancelacion, r.created_at,
          s.pagado, s.saldo,
-         hu.id AS huesped_id, CONCAT(hu.nombre, ' ', hu.apellidos) AS huesped, hu.telefono, hu.email,
+         hu.id AS huesped_id, CONCAT(hu.nombre, ' ', hu.apellidos) AS huesped, hu.telefono, hu.email, (hu.telegram_chat_id IS NOT NULL) AS telegram,
          hab.id AS habitacion_id, hab.numero, hab.estado AS estado_habitacion, t.nombre AS tipo,
          e.check_in_real, e.check_out_real, e.placas_vehiculo, e.observaciones
   FROM reservaciones r
@@ -21,7 +21,7 @@ const aDTO = (f) => ({
   numAdultos: f.num_adultos, numNinos: f.num_ninos,
   precioNoche: n(f.precio_noche), total: n(f.total), pagado: n(f.pagado), saldo: n(f.saldo),
   motivoCancelacion: f.motivo_cancelacion, creadaEn: f.created_at,
-  huesped: { id: f.huesped_id, nombre: f.huesped, telefono: f.telefono, email: f.email },
+  huesped: { id: f.huesped_id, nombre: f.huesped, telefono: f.telefono, email: f.email, telegramVinculado: f.telegram },
   habitacion: { id: f.habitacion_id, numero: f.numero, tipo: f.tipo, estado: f.estado_habitacion },
   estancia: f.check_in_real ? { checkInReal: f.check_in_real, checkOutReal: f.check_out_real,
                                 placasVehiculo: f.placas_vehiculo, observaciones: f.observaciones } : null,

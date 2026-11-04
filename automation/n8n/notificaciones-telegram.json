@@ -1,0 +1,181 @@
+{
+  "name": "PMS · Notificaciones por Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "6fb61e4e-6d8d-43e0-a61d-6ae5c5ad2c46",
+      "name": "Cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM fn_tomar_notificaciones(20);",
+        "options": {}
+      },
+      "id": "908127be-40c6-4724-b917-57bc34e1c870",
+      "name": "Tomar notificaciones",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.mensaje }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "8e985568-6a83-4cc7-b2be-8acfa3a2bcc2",
+      "name": "Enviar por Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Bot del hotel"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT fn_registrar_envio($1::bigint, true) AS resultado;",
+        "options": {
+          "queryReplacement": "={{ $('Tomar notificaciones').item.json.evento_id }}",
+          "queryBatching": "independently"
+        }
+      },
+      "id": "d93d34dc-fe06-45e1-b13d-55323a81f88a",
+      "name": "Marcar enviada",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        720,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT fn_registrar_envio($1::bigint, false, 'Telegram rechazó el mensaje; revisa el registro de ejecuciones de n8n') AS resultado;",
+        "options": {
+          "queryReplacement": "={{ $('Tomar notificaciones').item.json.evento_id }}",
+          "queryBatching": "independently"
+        }
+      },
+      "id": "55a9f7d1-e323-4ec6-8b1d-7d88f5426838",
+      "name": "Marcar fallida (se reintenta)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        720,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Notificaciones del PMS\nCada minuto toma los eventos nuevos (reservación confirmada, cancelada, pago, check-in, check-out, cuarto a mantenimiento) y los envía por Telegram.\n\nLos textos y destinatarios los arma PostgreSQL en `database/09_notificaciones.sql`. Si Telegram falla, se reintenta hasta 5 veces.",
+        "height": 220,
+        "width": 420
+      },
+      "id": "abb200a3-5d63-4f8e-8cc5-9bc6a04f4109",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -300
+      ]
+    }
+  ],
+  "connections": {
+    "Cada minuto": {
+      "main": [
+        [
+          {
+            "node": "Tomar notificaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tomar notificaciones": {
+      "main": [
+        [
+          {
+            "node": "Enviar por Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar por Telegram": {
+      "main": [
+        [
+          {
+            "node": "Marcar enviada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallida (se reintenta)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Mexico_City"
+  },
+  "pinData": {},
+  "active": false
+}

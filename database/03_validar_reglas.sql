@@ -194,6 +194,28 @@ BEGIN
     $q$INSERT INTO usuarios (nombre, apellidos, email, password_hash, rol) VALUES ('X', 'Y', 'r@y.mx', crypt('Demo1234', gen_salt('bf', 10)), 'recepcion')$q$);
 
   RAISE NOTICE '';
+  RAISE NOTICE '==== NOTIFICACIONES (requiere 09_notificaciones.sql) ====';
+  UPDATE eventos_dominio SET procesado = TRUE;   -- empezar sin pendientes
+  PERFORM pg_temp.debe_cumplir('RN-81', 'El huésped vincula su Telegram mandando su código',
+    $q$fn_bot_responder('/start ' || (SELECT codigo FROM reservaciones WHERE fecha_entrada = '2030-01-13'), 'chat-prueba') LIKE '¡Listo, Lucas%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-81', 'Una reservación cancelada no se puede vincular',
+    $q$fn_bot_responder('/start ' || (SELECT codigo FROM reservaciones WHERE fecha_entrada = '2030-05-01'), 'otro-chat') LIKE 'No encontré%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-81', 'Un saludo no se confunde con un código',
+    $q$fn_bot_responder('hola', 'chat-prueba') LIKE '¡Hola%'$q$);
+  INSERT INTO eventos_dominio (tipo, agregado, agregado_id)
+    SELECT 'reservacion.cancelada', 'reservacion', id FROM reservaciones WHERE fecha_entrada = '2030-05-01';
+  INSERT INTO eventos_dominio (tipo, agregado, agregado_id)
+    SELECT 'reservacion.creada', 'reservacion', id FROM reservaciones WHERE fecha_entrada = '2030-01-13';
+  -- La de Ana (cancelada) no tiene Telegram → se descarta; la de Lucas sí → se envía
+  PERFORM pg_temp.debe_cumplir('RN-85', 'Se envía solo lo que tiene destinatario (1 de 2 eventos)',
+    $q$(SELECT count(*) FROM fn_tomar_notificaciones(20)) = 1$q$);
+  PERFORM pg_temp.debe_cumplir('RN-85', 'Pedir otra vez no repite el mensaje',
+    $q$(SELECT count(*) FROM fn_tomar_notificaciones(20)) = 0$q$);
+  PERFORM pg_temp.debe_cumplir('RN-81', 'El mensaje va al chat de Lucas con el código de su reservación',
+    $q$EXISTS (SELECT 1 FROM notificaciones n WHERE n.destinatario = 'chat-prueba'
+             AND n.mensaje LIKE '%' || (SELECT codigo FROM reservaciones WHERE fecha_entrada = '2030-01-13') || '%')$q$);
+
+  RAISE NOTICE '';
   RAISE NOTICE 'Listo. Todos los cambios de prueba se deshacen (ROLLBACK).';
 END $$;
 

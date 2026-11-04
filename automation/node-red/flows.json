@@ -1,0 +1,263 @@
+[
+  {
+    "id": "171f574033694a86",
+    "type": "tab",
+    "label": "PMS Hotel · Telegram",
+    "disabled": false,
+    "info": "Bot de Telegram del PMS.\n\n1. Conversación: el huésped manda su código de reservación y queda vinculado (fn_bot_responder).\n2. Resumen diario a recepción a las 8:00 (fn_resumen_diario).\n\nLos textos los arma PostgreSQL: database/09_notificaciones.sql"
+  },
+  {
+    "id": "8ee78a9bec3442f7",
+    "type": "comment",
+    "z": "171f574033694a86",
+    "name": "① Conversación con huéspedes (vincular código, /estado, /miid)",
+    "info": "",
+    "x": 300,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "cb4a91efa2964ee0",
+    "type": "telegram receiver",
+    "z": "171f574033694a86",
+    "name": "Mensaje recibido",
+    "bot": "1357d6a780264d3f",
+    "saveDataDir": "",
+    "filterCommands": false,
+    "hasinput": false,
+    "inputs": 0,
+    "x": 130,
+    "y": 100,
+    "wires": [
+      [
+        "230e6f48bf054cf5"
+      ],
+      []
+    ]
+  },
+  {
+    "id": "230e6f48bf054cf5",
+    "type": "function",
+    "z": "171f574033694a86",
+    "name": "Preparar consulta",
+    "func": "// Solo mensajes de texto (se ignoran fotos, stickers, etc.)\nif (msg.payload.type !== 'message' || typeof msg.payload.content !== 'string') return null;\n\n// Parámetros $1, $2, $3 de la consulta: nunca se pegan al SQL (evita inyección SQL)\nmsg.params = [\n  msg.payload.content.slice(0, 200),\n  String(msg.payload.chatId),\n  msg.originalMessage?.from?.first_name ?? null,\n];\nmsg.chatId = msg.payload.chatId;\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 340,
+    "y": 100,
+    "wires": [
+      [
+        "e99dc36604034d17"
+      ]
+    ]
+  },
+  {
+    "id": "e99dc36604034d17",
+    "type": "postgresql",
+    "z": "171f574033694a86",
+    "name": "fn_bot_responder",
+    "query": "SELECT fn_bot_responder($1, $2, $3) AS respuesta;",
+    "postgreSQLConfig": "d59647e61eef4ca4",
+    "split": false,
+    "rowsPerMsg": 1,
+    "outputs": 1,
+    "x": 550,
+    "y": 100,
+    "wires": [
+      [
+        "65aaca45b16f4f1d"
+      ]
+    ]
+  },
+  {
+    "id": "65aaca45b16f4f1d",
+    "type": "function",
+    "z": "171f574033694a86",
+    "name": "Armar respuesta",
+    "func": "const respuesta = msg.payload?.[0]?.respuesta;\nif (!respuesta) return null;\nmsg.payload = { chatId: msg.chatId, type: 'message', content: respuesta };\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 760,
+    "y": 100,
+    "wires": [
+      [
+        "5d9834644f2a4481"
+      ]
+    ]
+  },
+  {
+    "id": "5d9834644f2a4481",
+    "type": "telegram sender",
+    "z": "171f574033694a86",
+    "name": "Responder",
+    "bot": "1357d6a780264d3f",
+    "haserroroutput": false,
+    "outputs": 1,
+    "x": 950,
+    "y": 100,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "256d1ea9c31c467b",
+    "type": "comment",
+    "z": "171f574033694a86",
+    "name": "② Resumen diario para recepción (8:00 hrs)",
+    "info": "Se envía a cada hotel que tenga telegram_chat_id registrado.\nPara registrarlo: escribe /miid al bot desde el grupo de recepción y guarda ese número con:\nUPDATE hoteles SET telegram_chat_id = '...' WHERE nombre = '...';",
+    "x": 250,
+    "y": 200,
+    "wires": []
+  },
+  {
+    "id": "324754d4bb9b4311",
+    "type": "inject",
+    "z": "171f574033694a86",
+    "name": "Todos los días 8:00",
+    "props": [],
+    "repeat": "",
+    "crontab": "00 08 * * *",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 150,
+    "y": 260,
+    "wires": [
+      [
+        "159812a1f806444a"
+      ]
+    ]
+  },
+  {
+    "id": "3063acbeb12b4bed",
+    "type": "inject",
+    "z": "171f574033694a86",
+    "name": "Probar ahora",
+    "props": [],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "x": 130,
+    "y": 310,
+    "wires": [
+      [
+        "159812a1f806444a"
+      ]
+    ]
+  },
+  {
+    "id": "159812a1f806444a",
+    "type": "postgresql",
+    "z": "171f574033694a86",
+    "name": "fn_resumen_diario",
+    "query": "SELECT telegram_chat_id AS chat, fn_resumen_diario(id) AS texto FROM v_hoteles_con_telegram;",
+    "postgreSQLConfig": "d59647e61eef4ca4",
+    "split": false,
+    "rowsPerMsg": 1,
+    "outputs": 1,
+    "x": 380,
+    "y": 280,
+    "wires": [
+      [
+        "1664395627624b20"
+      ]
+    ]
+  },
+  {
+    "id": "1664395627624b20",
+    "type": "function",
+    "z": "171f574033694a86",
+    "name": "Un mensaje por hotel",
+    "func": "const hoteles = Array.isArray(msg.payload) ? msg.payload : [];\nif (hoteles.length === 0) { node.warn('Ningún hotel tiene telegram_chat_id registrado'); return null; }\n// Regresar [arreglo] manda varios mensajes por la misma salida\nreturn [hoteles.map((h) => ({ payload: { chatId: h.chat, type: 'message', content: h.texto } }))];",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 600,
+    "y": 280,
+    "wires": [
+      [
+        "00ef9309926d415c"
+      ]
+    ]
+  },
+  {
+    "id": "00ef9309926d415c",
+    "type": "telegram sender",
+    "z": "171f574033694a86",
+    "name": "Enviar a recepción",
+    "bot": "1357d6a780264d3f",
+    "haserroroutput": false,
+    "outputs": 1,
+    "x": 810,
+    "y": 280,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "1357d6a780264d3f",
+    "type": "telegram bot",
+    "botname": "BOT_DEL_HOTEL",
+    "usernames": "",
+    "chatids": "",
+    "baseapiurl": "",
+    "testenvironment": false,
+    "updatemode": "polling",
+    "addressfamily": "",
+    "pollinterval": 300,
+    "usesocks": false,
+    "sockshost": "",
+    "socksprotocol": "socks5",
+    "socksport": 6667,
+    "socksusername": "anonymous",
+    "sockspassword": "",
+    "bothost": "",
+    "botpath": "",
+    "localbothost": "0.0.0.0",
+    "localbotport": 8443,
+    "publicbotport": 8443,
+    "privatekey": "",
+    "certificate": "",
+    "useselfsignedcertificate": false,
+    "sslterminated": false,
+    "verboselogging": false
+  },
+  {
+    "id": "d59647e61eef4ca4",
+    "type": "postgreSQLConfig",
+    "name": "hotel_pms",
+    "host": "127.0.0.1",
+    "hostFieldType": "str",
+    "port": 5432,
+    "portFieldType": "num",
+    "database": "hotel_pms",
+    "databaseFieldType": "str",
+    "ssl": "false",
+    "sslFieldType": "bool",
+    "applicationName": "node-red-pms",
+    "applicationNameType": "str",
+    "max": 5,
+    "maxFieldType": "num",
+    "idle": 1000,
+    "idleFieldType": "num",
+    "connectionTimeout": 10000,
+    "connectionTimeoutFieldType": "num",
+    "userFieldType": "str",
+    "userEnv": "",
+    "passwordFieldType": "str",
+    "passwordEnv": ""
+  }
+]

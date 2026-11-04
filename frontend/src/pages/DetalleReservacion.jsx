@@ -8,6 +8,9 @@ import { dinero, fechaHora, fechaLarga, plural } from '../utils/formato.js';
 import { Aviso, Boton, Cargando, Encabezado, EstadoReservacion, Vacio } from '../components/comunes.jsx';
 import { ModalCancelar, ModalCheckIn, ModalPago } from '../components/AccionesEstancia.jsx';
 
+// Usuario del bot (sin @). Se configura en frontend/.env:  VITE_TELEGRAM_BOT=MiHotelBot
+const BOT = import.meta.env.VITE_TELEGRAM_BOT;
+
 export default function DetalleReservacion() {
   const { id } = useParams();
   const { state } = useLocation();
@@ -58,6 +61,8 @@ export default function DetalleReservacion() {
             {r.estancia?.placasVehiculo && <><dt>Placas</dt><dd className="mono">{r.estancia.placasVehiculo}</dd></>}
             {r.estancia?.observaciones && <><dt>Notas</dt><dd style={{ fontWeight: 400 }}>{r.estancia.observaciones}</dd></>}
             {r.motivoCancelacion && <><dt>Motivo</dt><dd style={{ fontWeight: 400 }}>{r.motivoCancelacion}</dd></>}
+            <dt>Telegram</dt>
+            <dd>{r.huesped.telegramVinculado ? '✅ Recibe avisos' : <EnlaceTelegram codigo={r.codigo} activa={['pendiente', 'confirmada', 'check_in'].includes(r.estado)} />}</dd>
           </dl>
         </section>
 
@@ -86,5 +91,23 @@ export default function DetalleReservacion() {
       {modal === 'cancelar' && <ModalCancelar reservacion={r} alCerrar={() => setModal(null)} alTerminar={() => recargar('Reservación cancelada. Las fechas quedaron libres.')} />}
       {modal === 'pago' && <ModalPago reservacion={r} saldo={saldo} alCerrar={() => setModal(null)} alTerminar={() => recargar('Pago registrado.')} />}
     </>
+  );
+}
+
+/** RN-81: enlace para que el huésped vincule su Telegram con un clic */
+function EnlaceTelegram({ codigo, activa }) {
+  const [copiado, setCopiado] = useState(false);
+  if (!activa) return <span className="tenue" style={{ fontWeight: 400 }}>No vinculado</span>;
+  if (!BOT) return <span className="tenue" style={{ fontWeight: 400 }}>Configura VITE_TELEGRAM_BOT en frontend/.env</span>;
+  const enlace = `https://t.me/${BOT}?start=${codigo}`;
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(enlace); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { /* sin permiso */ }
+  };
+  return (
+    <span style={{ fontWeight: 400 }}>
+      <a href={enlace} target="_blank" rel="noreferrer" className="mono" style={{ fontSize: 12.5 }}>t.me/{BOT}?start={codigo}</a>{' '}
+      <Boton chico onClick={copiar}>{copiado ? '¡Copiado!' : 'Copiar'}</Boton>
+      <br /><small className="tenue">Mándaselo al huésped por WhatsApp: al abrirlo queda vinculado.</small>
+    </span>
   );
 }

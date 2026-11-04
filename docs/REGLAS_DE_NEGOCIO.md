@@ -33,8 +33,8 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Pagos | 6 | 0 | 0 | 1 |
 | Tarifas | 2 | 0 | 0 | 0 |
 | Usuarios y seguridad | 6 | 0 | 0 | 0 |
-| Automatización y notificaciones | 1 | 0 | 2 | 1 |
-| **Total** | **47** | **0** | **2** | **3** |
+| Automatización y notificaciones | 5 | 0 | 0 | 1 |
+| **Total** | **51** | **0** | **0** | **3** |
 
 ---
 
@@ -326,18 +326,37 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 
 ## 8. Automatización y notificaciones
 
+**Cómo funciona:** el backend guarda cada evento en `eventos_dominio` (patrón *outbox*). PostgreSQL arma los textos con funciones de cadena (`database/09_notificaciones.sql`). **n8n** los envía y **Node-RED** atiende la conversación con el bot. Así, si Telegram o n8n se caen, el sistema del hotel sigue funcionando y los avisos salen cuando regresan.
+
 ### RN-80 · Todo evento importante queda registrado para las automatizaciones ✅
-- **Regla:** al crear una reservación se inserta el evento `reservacion.creada` en `eventos_dominio`. Desde ahí lo leen n8n y Node-RED.
-- **Dónde se aplica:** caso de uso + adaptador `PostgresOutboxPublisher`.
+- **Regla:** reservación creada, confirmada o cancelada, pago registrado, check-in, check-out y cambio de estado de habitación generan un evento en `eventos_dominio`, en la **misma petición** que hizo el cambio.
+- **Dónde se aplica:** casos de uso + adaptador `PostgresOutboxPublisher`.
 
-### RN-81 · El huésped recibe su confirmación por Telegram ⬜
-- **Regla:** n8n lee los eventos `reservacion.creada` sin procesar, envía el mensaje, lo registra en `notificaciones` y marca el evento como procesado.
+### RN-81 · El huésped recibe sus avisos por Telegram ✅
+- **Regla:** cuando el huésped vincula su Telegram, recibe la confirmación de su reservación, los recibos de pago, la bienvenida al hacer check-in y, si se cancela, el aviso con el motivo.
+- **Cómo se vincula:** recepción le manda el enlace `t.me/<bot>?start=<código>` (botón **Copiar** en el detalle de la reservación). Al abrirlo, el bot reconoce el código y guarda su chat. También puede escribir el código a mano. Solo se vinculan reservaciones activas.
+- **Comandos del bot:** `/estado` (mis reservaciones) y `/miid` (número del chat, para configurar recepción).
+- **Dónde se aplica:** `fn_bot_responder()` y `fn_armar_notificacion()` en la BD + flujo de Node-RED (conversación) + flujo de n8n (envío).
 
-### RN-82 · Recepción recibe cada mañana el resumen del día ⬜
-- **Regla:** Node-RED envía a las 8:00 el porcentaje de ocupación (`v_ocupacion_hoy`) y las llegadas del día.
+### RN-82 · Recepción recibe cada mañana el resumen del día ✅
+- **Regla:** a las 8:00 cada hotel con chat de recepción registrado recibe: ocupación, quién llega (y si falta confirmar), quién sale (y si debe dinero), cuartos por limpiar y reservaciones sin confirmar.
+- **Dónde se aplica:** `fn_resumen_diario()` + flujo de Node-RED con horario `00 08 * * *`.
 
 ### RN-83 · ¿Cuándo se marca un "no show"? ❓
 - **Pregunta para el hotel:** si el huésped no llega, ¿a qué hora se marca `no_show` y se libera la habitación?
+
+### RN-84 · Recepción y limpieza se enteran al momento ✅ *(nueva)*
+- **Regla:** al hacer check-out llega al chat de recepción *"🧹 La habitación 201 quedó libre y está lista para limpiar"*. Cuando un cuarto pasa a mantenimiento llega un aviso, que incluye cuántas reservaciones hay que reubicar.
+- **Dónde se aplica:** `fn_armar_notificacion()` + flujo de n8n.
+
+### RN-85 · Cada aviso se envía una sola vez, y si falla se reintenta ✅ *(nueva)*
+- **Regla:**
+  - Un evento nunca se envía dos veces, aunque n8n se ejecute dos veces al mismo tiempo (`FOR UPDATE SKIP LOCKED` + marca `tomado_en`).
+  - Si Telegram rechaza el mensaje se reintenta hasta **5 veces**; después queda como `fallida`.
+  - Los eventos sin destinatario (huésped sin Telegram) se descartan sin error.
+  - Todo queda en la bitácora `notificaciones`.
+- **Dónde se aplica:** `fn_tomar_notificaciones()` y `fn_registrar_envio()`.
+
 
 ---
 
@@ -349,7 +368,7 @@ cd backend && npm test
 ```
 Son 157 pruebas. Cubren las reglas de reservaciones, precios, huéspedes, habitaciones, pagos, estancias y seguridad (permisos por rol, sesiones, bloqueo de intentos) usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
 
-**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55, RN-60, RN-70, RN-71 y RN-75 (48 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y las reglas de los archivos `05` a `08`:
+**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55, RN-60, RN-70, RN-71, RN-75, RN-81 y RN-85 (54 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y los archivos `05` a `09`:
 ```bash
 psql -h localhost -U pms_admin -d hotel_pms < database/03_validar_reglas.sql 2>&1 | sed 's/NOTICE:  //'
 ```
@@ -373,3 +392,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 | 2026-10-26 | Módulos de pagos y estancias: check-in, check-out, pagos y saldo (RN-42, 43, 52 + nuevas RN-44, 45, 46, 54, 55, 56). Total: 43 reglas | Edwin |
 | 2026-10-26 | Huéspedes, habitaciones, hoteles y precio automático (RN-61 + nuevas RN-24, 25, 31, 32, 33, 34). Total: 49 reglas | Edwin |
 | 2026-10-26 | Login y roles: RN-71, RN-72 + nuevas RN-73, 74, 75. Corregido: el explorador enviaba los hashes de contraseña al navegador. Total: 52 reglas | Edwin |
+| 2026-11-04 | Notificaciones por Telegram con n8n y Node-RED: RN-81, RN-82 + nuevas RN-84, RN-85. Total: 54 reglas, **51 implementadas** y 3 preguntas para el hotel | Edwin |
