@@ -120,7 +120,7 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Regla:** `fecha_entrada ≥ hoy`, en la zona horaria de Chiapas (America/Mexico_City). Reservar para el mismo día sí se permite.
 - **Dónde se aplica:** **solo en el dominio** (`Reservacion.validarFechaNoPasada()`). La fecha de hoy la da el puerto `Reloj`, implementado por `RelojSistema`.
 - **¿Por qué no en la BD?** Porque impediría cargar las reservaciones históricas cuando un hotel pase sus agendas de papel al sistema.
-- **¿Por qué la zona horaria?** En AWS el servidor corre en hora UTC: a las 8 p.m. en Chiapas allá ya es el día siguiente, y sin este ajuste se rechazarían reservaciones válidas para hoy.
+- **¿Por qué la zona horaria?** Los servidores en la nube suelen correr en hora UTC: a las 8 p.m. en Chiapas allá ya es el día siguiente, y sin este ajuste se rechazarían reservaciones válidas para hoy. Así el sistema funciona igual en la compu del hotel o en un servidor.
 - **Cómo validarlo:** prueba unitaria `RN-14 rechaza fecha de entrada en el pasado`.
 
 ### RN-15 · ¿Cuánto tiempo puede estar una reservación "pendiente"? ❓
@@ -314,7 +314,7 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ### RN-74 · Bloqueo tras 5 intentos fallidos ✅ *(nueva)*
 - **Regla:** después de 5 contraseñas equivocadas para el mismo correo, se bloquea el login 15 minutos (HTTP 429), aunque luego se escriba la correcta.
 - **Dónde se aplica:** caso de uso `IniciarSesion` + puerto `ContadorIntentos`.
-- **Limitación conocida:** el adaptador actual (`MemoriaContadorIntentos`) guarda la cuenta en memoria: se reinicia si se reinicia el servidor. Para varios servidores en AWS se cambiaría por un adaptador con Redis o con una tabla, **sin tocar el caso de uso** (esa es la ventaja de la arquitectura hexagonal).
+- **Limitación conocida:** el adaptador actual (`MemoriaContadorIntentos`) guarda la cuenta en memoria: se reinicia si se reinicia el servidor. Si algún día corre en varios servidores, se cambiaría por un adaptador con Redis o con una tabla, **sin tocar el caso de uso** (esa es la ventaja de la arquitectura hexagonal).
 
 ### RN-75 · Cada usuario solo trabaja con su hotel ✅ *(nueva)*
 - **Regla:** la recepcionista de Posada Los Arcos no puede ver ni tocar reservaciones, habitaciones ni cobros del Hotel Boutique Cañón. Solo el **admin general** (sin hotel asignado) ve todos los hoteles. Todo usuario que no es admin debe tener hotel.

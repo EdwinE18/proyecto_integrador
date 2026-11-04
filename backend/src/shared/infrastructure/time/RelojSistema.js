@@ -1,5 +1,5 @@
 // ADAPTADOR: "hoy" según el reloj del servidor, en la zona horaria de Chiapas.
-// Importante en AWS: el servidor corre en UTC, y a las 8 p.m. en Chiapas allá ya es "mañana".
+// Importante si algún día corre en la nube: esos servidores suelen estar en UTC, y a las 8 p.m. en Chiapas allá ya es "mañana".
 import { Reloj } from '../../../modules/reservaciones/domain/ports/Reloj.js';
 
 export class RelojSistema extends Reloj {
