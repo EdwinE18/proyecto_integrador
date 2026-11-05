@@ -42,7 +42,10 @@ PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/09_notificaciones.sql"
 
 read -rp "¿Cargar datos de prueba? (s/n) " R
-[[ "$R" == "s" ]] && PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/02_seed.sql"
+if [[ "$R" == "s" ]]; then
+  PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/02_seed.sql"
+  PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/10_datos_demo.sql"
+fi
 
 echo "✅ Listo. Conéctate con:  psql -h localhost -U $DB_USER -d $DB_NAME"
 echo "   DATABASE_URL=postgres://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME"

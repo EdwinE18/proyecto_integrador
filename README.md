@@ -218,6 +218,26 @@ eventos_dominio 1─N notificaciones
 
 ---
 
+### Consultas para la evaluación de Base de Datos
+
+`database/11_consultas_evaluacion.sql` reúne, sobre las tablas reales del hotel, un ejemplo de cada tema evaluado (cada consulta tiene un número para ubicarla rápido):
+
+| Tema | Consultas | Qué muestra |
+|---|---|---|
+| 1. Selección | 1.1 – 1.5 | `WHERE` con comparación, `IN`, `BETWEEN`, `ILIKE`, `IS NULL` |
+| 2. Proyección | 2.1 – 2.4 | Columnas específicas, alias, columnas calculadas, `DISTINCT` |
+| 3. UNION | 3.1 – 3.4 | Llegadas + salidas de hoy, directorio de contactos, `UNION` vs `UNION ALL`, estado de cuenta |
+| 4. Funciones | 4.1 – 4.6 | Agregación con `GROUP BY` y `HAVING`, fechas, `COALESCE`/`NULLIF`/`CAST`, funciones PL/pgSQL propias |
+| 5. Subconsultas | 5.1 – 5.6 | `IN`, `NOT EXISTS` (regla anti-sobreventa), escalar, contra el promedio, en el `FROM`, correlacionada |
+| 6. Funciones numéricas | 6.1 – 6.6 | `ROUND`, `TRUNC`, `CEIL`, `FLOOR`, `ABS`, `MOD`, `POWER`, `SQRT`, `GREATEST`; IVA y anticipos |
+| 7. Manipulación de caracteres | 7.1 – 7.6 | `CONCAT`, `UPPER`, `INITCAP`, `SUBSTRING`, `SPLIT_PART`, `REPLACE`, `TRANSLATE`, `STRING_AGG`… (y `04_funciones_cadena.sql`) |
+| 8. Reglas de precedencia | 8.1 – 8.6 | `*` antes que `+`, división entera, **`AND` antes que `OR` con resultados distintos**, `NOT`, el `CHECK` de RN-12 |
+
+```bash
+psql -h localhost -U pms_admin -d hotel_pms -f database/10_datos_demo.sql          # datos de demostración (una vez)
+psql -h localhost -U pms_admin -d hotel_pms -f database/11_consultas_evaluacion.sql
+```
+
 ## 4. Automatización (Telegram)
 
 1. El backend guarda cada evento importante en `eventos_dominio`: reservación confirmada o cancelada, pago, check-in, check-out, cuarto a mantenimiento.
