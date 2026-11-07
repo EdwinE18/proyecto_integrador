@@ -2,10 +2,12 @@
 --  DATOS DE DEMOSTRACIÓN (para la presentación y para 11_consultas_evaluacion.sql)
 --     psql -h localhost -U pms_admin -d hotel_pms -f database/10_datos_demo.sql
 --
---  Las fechas son RELATIVAS A HOY (CURRENT_DATE ± días), así que el tablero
---  siempre muestra gente que llega, que sale y que está hospedada.
+--  Las fechas son RELATIVAS AL DÍA EN QUE SE EJECUTA (CURRENT_DATE ± días).
+--  👉 Ejecútalo EL MISMO DÍA de la presentación: si ya estaban cargados de
+--     otro día, los borra y los vuelve a crear con la fecha de hoy.
+--  Solo toca los datos de demostración (ids que empiezan con c000… y d000…);
+--  tus otras reservaciones y huéspedes no se modifican.
 --  Respeta todas las reglas: los triggers de la BD revisan cada inserción.
---  Si ya se cargaron, no hace nada (se puede ejecutar varias veces).
 -- =====================================================================
 SET client_min_messages = notice;
 
@@ -15,10 +17,33 @@ DECLARE
   ARCOS CONSTANT UUID := '11111111-1111-1111-1111-111111111111';
   CANON CONSTANT UUID := '22222222-2222-2222-2222-222222222222';
 BEGIN
+  -- ---------- Si ya existían (de otro día), se borran para recrearlos con la fecha de hoy ----------
   IF EXISTS (SELECT 1 FROM huespedes WHERE id = 'c0000000-0000-0000-0000-000000000001') THEN
-    RAISE NOTICE 'Los datos de demostración ya estaban cargados.';
-    RETURN;
+    DELETE FROM notificaciones  WHERE evento_id IN (SELECT id FROM eventos_dominio WHERE agregado_id::text LIKE 'd0000000%');
+    DELETE FROM eventos_dominio WHERE agregado_id::text LIKE 'd0000000%';
+    DELETE FROM pagos           WHERE reservacion_id::text LIKE 'd0000000%';
+    DELETE FROM estancias       WHERE reservacion_id::text LIKE 'd0000000%';
+    DELETE FROM reservaciones   WHERE id::text LIKE 'd0000000%';
+    DELETE FROM huespedes h     WHERE h.id::text LIKE 'c0000000%'
+                                  AND NOT EXISTS (SELECT 1 FROM reservaciones r WHERE r.huesped_id = h.id);
+    RAISE NOTICE 'Se borraron los datos de demostración anteriores; se vuelven a crear con la fecha de hoy.';
   END IF;
+
+  -- Los cuartos que usa la demostración deben estar en servicio para poder reservarlos (RN-13).
+  -- Los que tienen un huésped real hospedado hoy no se tocan.
+  UPDATE habitaciones h SET estado = 'disponible'
+   WHERE h.hotel_id IN (ARCOS, CANON)
+     AND NOT EXISTS (SELECT 1 FROM reservaciones r
+                     WHERE r.habitacion_id = h.id AND r.estado = 'check_in' AND r.id::text NOT LIKE 'd0000000%');
+
+  -- Si alguna reservación tuya de prueba ocupa los mismos cuartos y fechas que la demostración,
+  -- la regla anti-sobreventa (RN-01) no dejaría crear la demo: esas se cancelan con motivo.
+  UPDATE reservaciones r
+     SET estado = 'cancelada', motivo_cancelacion = 'Liberada para los datos de demostración'
+   WHERE r.estado IN ('pendiente', 'confirmada')
+     AND r.id::text NOT LIKE 'd0000000%'
+     AND r.hotel_id IN (ARCOS, CANON)
+     AND daterange(r.fecha_entrada, r.fecha_salida, '[)') && daterange(D - 31, D + 13, '[)');
 
   -- ------------------------- Huéspedes -------------------------
   INSERT INTO huespedes (id, nombre, apellidos, email, telefono, tipo_documento, num_documento, nacionalidad, ciudad_origen, fecha_nacimiento) VALUES
@@ -29,7 +54,8 @@ BEGIN
     ('c0000000-0000-0000-0000-000000000005', 'Jorge',   'Castillo Peña',    NULL,                   '5533221100', NULL,        NULL,            'Mexicana',    'CDMX',       '1990-06-30'),
     ('c0000000-0000-0000-0000-000000000006', 'Lucía',   'Mendoza Pérez',    'lucia.mp@correo.mx',   '9614445566', 'pasaporte', 'G12345678',     'Mexicana',    'Oaxaca',     '2000-09-18'),
     ('c0000000-0000-0000-0000-000000000007', 'Pierre',  'Dubois',           'pierre.d@mail.fr',     '+33612345678','pasaporte', '19FR45821',     'Francesa',    'Lyon',       '1985-04-12'),
-    ('c0000000-0000-0000-0000-000000000008', 'Emma',    'Johnson',          'emma.j@mail.com',      NULL,         'pasaporte', 'US5501234',     'Estadounidense','Austin',   '1998-12-24');
+    ('c0000000-0000-0000-0000-000000000008', 'Emma',    'Johnson',          'emma.j@mail.com',      NULL,         'pasaporte', 'US5501234',     'Estadounidense','Austin',   '1998-12-24')
+  ON CONFLICT (id) DO NOTHING;
 
   -- ------------------------- Reservaciones -------------------------
   -- (id, hotel, huésped, habitación, entrada, salida, adultos, niños, precio, estado inicial, canal)
@@ -47,7 +73,8 @@ BEGIN
     ('d0000000-0000-0000-0000-000000000009', CANON, 'c0000000-0000-0000-0000-000000000007', '10',   -9,  -6, 2, 0, 'ota'),
     ('d0000000-0000-0000-0000-000000000010', CANON, 'c0000000-0000-0000-0000-000000000006', 'S1',   -1,   2, 2, 2, 'web'),
     ('d0000000-0000-0000-0000-000000000011', CANON, 'c0000000-0000-0000-0000-000000000001', '11',    3,   6, 2, 1, 'telegram'),
-    ('d0000000-0000-0000-0000-000000000012', CANON, 'c0000000-0000-0000-0000-000000000008', '10',  -30, -28, 1, 0, 'ota')
+    ('d0000000-0000-0000-0000-000000000012', CANON, 'c0000000-0000-0000-0000-000000000008', '10',  -30, -28, 1, 0, 'ota'),
+    ('d0000000-0000-0000-0000-000000000013', ARCOS, 'b0000000-0000-0000-0000-000000000002', '201',  -1,   2, 2, 0, 'telefono')   -- hospedado hoy
   ) AS v(id, hotel, huesped, numero, ent, sal, ad, ni, canal)
   JOIN habitaciones h ON h.hotel_id = v.hotel::uuid AND h.numero = v.numero
   JOIN tipos_habitacion t ON t.id = h.tipo_id;
@@ -61,7 +88,8 @@ BEGIN
   -- Check-in de las estancias pasadas y de las actuales (RN-42: desde confirmada)
   UPDATE reservaciones SET estado = 'check_in'
    WHERE id IN ('d0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000003',
-                'd0000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000009', 'd0000000-0000-0000-0000-000000000010');
+                'd0000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000009', 'd0000000-0000-0000-0000-000000000010',
+                'd0000000-0000-0000-0000-000000000013');
   INSERT INTO estancias (reservacion_id, check_in_real, placas_vehiculo)
   SELECT r.id, (r.fecha_entrada + TIME '15:30') AT TIME ZONE 'America/Mexico_City',
          CASE r.id WHEN 'd0000000-0000-0000-0000-000000000002' THEN 'PUE4821' WHEN 'd0000000-0000-0000-0000-000000000005' THEN 'DBC1234' END
@@ -80,7 +108,8 @@ BEGIN
     ('d0000000-0000-0000-0000-000000000007',  780.00, 'transferencia', 'SPEI 5530', true,   1),
     ('d0000000-0000-0000-0000-000000000009', 4200.00, 'tarjeta',       NULL,        false,  6),
     ('d0000000-0000-0000-0000-000000000010', 7800.00, 'tarjeta',       NULL,        false,  1),
-    ('d0000000-0000-0000-0000-000000000011', 2100.00, 'transferencia', 'SPEI 6610', true,   0)
+    ('d0000000-0000-0000-0000-000000000011', 2100.00, 'transferencia', 'SPEI 6610', true,   0),
+    ('d0000000-0000-0000-0000-000000000013', 1100.00, 'efectivo',      NULL,        true,   1)
   ) AS v(r, monto, metodo, ref, anticipo, hace);
 
   -- Check-out de las estancias pasadas (RN-52: ya están pagadas)
@@ -91,8 +120,8 @@ BEGIN
   FROM reservaciones r WHERE r.id = e.reservacion_id AND r.estado = 'check_out';
 
   -- Habitaciones ocupadas hoy y una por limpiar
-  UPDATE habitaciones SET estado = 'ocupada'  WHERE (hotel_id, numero) IN ((ARCOS, '202'), (CANON, 'S1'));
+  UPDATE habitaciones SET estado = 'ocupada'  WHERE (hotel_id, numero) IN ((ARCOS, '202'), (ARCOS, '201'), (CANON, 'S1'));
   UPDATE habitaciones SET estado = 'limpieza' WHERE (hotel_id, numero) IN ((CANON, '10'));
 
-  RAISE NOTICE 'Datos de demostración cargados: 8 huéspedes, 12 reservaciones, 10 pagos.';
+  RAISE NOTICE 'Datos de demostración cargados con fecha de hoy (%): 8 huéspedes, 13 reservaciones, 11 pagos.', TO_CHAR(D, 'DD/MM/YYYY');
 END $$;
