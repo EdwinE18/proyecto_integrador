@@ -113,6 +113,8 @@ Para crear un módulo nuevo copia el patrón de `reservaciones`: entidad → pue
 
 ## Inicio de sesión
 
+Los datos de prueba son de **Posada Los Arcos** (San Cristóbal): 12 habitaciones en 3 pisos (sencillas, dobles con chimenea, familiares y suites con terraza). El sistema admite más hoteles: cada uno vería solo lo suyo (RN-75).
+
 Toda la API pide sesión (excepto el login). Usuarios de prueba (contraseña `Demo1234`):
 
 | Correo | Rol | Hotel |
@@ -120,7 +122,7 @@ Toda la API pide sesión (excepto el login). Usuarios de prueba (contraseña `De
 | `admin@pms.local` | admin general | todos |
 | `recepcion@losarcos.mx` | recepción | Posada Los Arcos |
 | `limpieza@losarcos.mx` | limpieza | Posada Los Arcos |
-| `gerente@boutiquecanon.mx` | gerente | Hotel Boutique Cañón |
+| `gerente@losarcos.mx` | gerente | Posada Los Arcos |
 
 **Qué ve cada rol en el menú:**
 

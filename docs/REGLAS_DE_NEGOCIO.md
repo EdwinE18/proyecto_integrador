@@ -332,8 +332,9 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Limitación conocida:** el adaptador actual (`MemoriaContadorIntentos`) guarda la cuenta en memoria: se reinicia si se reinicia el servidor. Si algún día corre en varios servidores, se cambiaría por un adaptador con Redis o con una tabla, **sin tocar el caso de uso** (esa es la ventaja de la arquitectura hexagonal).
 
 ### RN-75 · Cada usuario solo trabaja con su hotel ✅ *(nueva)*
-- **Regla:** la recepcionista de Posada Los Arcos no puede ver ni tocar reservaciones, habitaciones ni cobros del Hotel Boutique Cañón. Solo el **admin general** (sin hotel asignado) ve todos los hoteles. Todo usuario que no es admin debe tener hotel.
+- **Regla:** si el sistema lo usan varios hoteles, la recepcionista de Posada Los Arcos no puede ver ni tocar reservaciones, habitaciones ni cobros de otro hotel. Solo el **admin general** (sin hotel asignado) ve todos los hoteles. Todo usuario que no es admin debe tener hotel.
 - **Dónde se aplica:** middleware `soloSuHotel()` (busca a qué hotel pertenece la reservación o la habitación) + entidad `Usuario` + BD (restricción `rn75_usuario_con_hotel`).
+- **Prueba:** los datos de demostración tienen un solo hotel; `03_validar_reglas.sql` crea un segundo hotel temporal para comprobar esta regla y lo borra al terminar.
 - **Nota:** el registro de **huéspedes es compartido** entre los hoteles a propósito: un viajero que se hospeda en los dos no se captura dos veces.
 - **Respuesta:** HTTP 403 con `"regla": "RN-75"`.
 
@@ -448,3 +449,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 | 2026-10-26 | Login y roles: RN-71, RN-72 + nuevas RN-73, 74, 75. Corregido: el explorador enviaba los hashes de contraseña al navegador. Total: 52 reglas | Edwin |
 | 2026-11-04 | Notificaciones por Telegram con n8n y Node-RED: RN-81, RN-82 + nuevas RN-84, RN-85. Total: 54 reglas, **51 implementadas** y 3 preguntas para el hotel | Edwin |
 | 2026-11-09 | Funciones de administración y gerencia: tarifas (nuevas RN-62, 63), personal (nuevas RN-76, 77), reportes (RN-78), datos del hotel (RN-79) y asistente de IA para el personal (RN-86, 87, 88). Total: 63 reglas, **60 implementadas** y 3 preguntas para el hotel | Edwin |
+| 2026-11-09 | Datos de prueba con un solo hotel (Posada Los Arcos) ampliado a 12 habitaciones y 4 tipos. Migración `13_un_solo_hotel.sql` para bases existentes | Edwin |

@@ -132,17 +132,19 @@ ORDER BY fecha;
 -- 4. FUNCIONES — de agregación, de fecha, de conversión y propias del sistema
 -- █████████████████████████████████████████████████████████████████████
 
-\echo '\n[4.1] Funciones de agregación (COUNT, SUM, AVG, MIN, MAX) con GROUP BY: ingresos por hotel'
-SELECT ho.nombre                     AS hotel,
+\echo '\n[4.1] Funciones de agregación (COUNT, SUM, AVG, MIN, MAX) con GROUP BY: ingresos por tipo de habitación'
+SELECT t.nombre                      AS tipo_habitacion,
        COUNT(p.id)                   AS pagos,
        SUM(p.monto)                  AS cobrado,
        ROUND(AVG(p.monto), 2)        AS pago_promedio,
        MIN(p.monto)                  AS pago_menor,
        MAX(p.monto)                  AS pago_mayor
 FROM pagos p
-JOIN reservaciones r ON r.id = p.reservacion_id
-JOIN hoteles ho ON ho.id = r.hotel_id
-GROUP BY ho.nombre;
+JOIN reservaciones r     ON r.id = p.reservacion_id
+JOIN habitaciones h      ON h.id = r.habitacion_id
+JOIN tipos_habitacion t  ON t.id = h.tipo_id
+GROUP BY t.nombre
+ORDER BY cobrado DESC;
 
 \echo '\n[4.2] Agregación con HAVING: canales que han traído 2 o más reservaciones'
 SELECT canal, COUNT(*) AS reservaciones
@@ -315,10 +317,10 @@ SELECT nombre, apellidos
 FROM huespedes
 WHERE LOWER(TRANSLATE(apellidos, 'áéíóúÁÉÍÓÚñÑ', 'aeiouAEIOUnN')) LIKE '%' || 'martinez' || '%';
 
-\echo '\n[7.6] STRING_AGG: todas las habitaciones de cada hotel en una sola línea'
-SELECT ho.nombre AS hotel, STRING_AGG(h.numero, ', ' ORDER BY h.numero) AS habitaciones
-FROM hoteles ho JOIN habitaciones h ON h.hotel_id = ho.id
-GROUP BY ho.nombre;
+\echo '\n[7.6] STRING_AGG: las habitaciones de cada piso en una sola línea'
+SELECT h.piso, COUNT(*) AS cuartos, STRING_AGG(h.numero || ' (' || t.nombre || ')', ', ' ORDER BY h.numero) AS habitaciones
+FROM habitaciones h JOIN tipos_habitacion t ON t.id = h.tipo_id
+GROUP BY h.piso ORDER BY h.piso;
 
 
 -- █████████████████████████████████████████████████████████████████████
@@ -351,18 +353,18 @@ SELECT 7 / 2        AS "7 / 2 (enteros)",
        7::numeric / 2 AS "CAST antes de dividir";
 
 \echo '\n[8.4] AND se evalúa antes que OR — LA MISMA CONDICIÓN DA RESULTADOS DISTINTOS'
-\echo '      Pregunta: "reservaciones pendientes o confirmadas DEL HOTEL CAÑÓN"'
-\echo '      a) SIN paréntesis (incorrecto): se lee  pendiente  OR  (confirmada AND Cañón)'
-SELECT r.codigo, r.estado, ho.nombre AS hotel
-FROM reservaciones r JOIN hoteles ho ON ho.id = r.hotel_id
-WHERE r.estado = 'pendiente' OR r.estado = 'confirmada' AND ho.nombre = 'Hotel Boutique Cañón'
-ORDER BY hotel;
-\echo '      b) CON paréntesis (correcto): (pendiente OR confirmada) AND Cañón'
-SELECT r.codigo, r.estado, ho.nombre AS hotel
-FROM reservaciones r JOIN hoteles ho ON ho.id = r.hotel_id
-WHERE (r.estado = 'pendiente' OR r.estado = 'confirmada') AND ho.nombre = 'Hotel Boutique Cañón'
-ORDER BY hotel;
-\echo '      (La versión a) cuela la reservación pendiente de la Posada Los Arcos, que no se pidió)'
+\echo '      Pregunta: "reservaciones pendientes o confirmadas EN EL PISO 2"'
+\echo '      a) SIN paréntesis (incorrecto): se lee  pendiente  OR  (confirmada AND piso 2)'
+SELECT r.codigo, r.estado, h.numero, h.piso
+FROM reservaciones r JOIN habitaciones h ON h.id = r.habitacion_id
+WHERE r.estado = 'pendiente' OR r.estado = 'confirmada' AND h.piso = 2
+ORDER BY h.piso, h.numero;
+\echo '      b) CON paréntesis (correcto): (pendiente OR confirmada) AND piso 2'
+SELECT r.codigo, r.estado, h.numero, h.piso
+FROM reservaciones r JOIN habitaciones h ON h.id = r.habitacion_id
+WHERE (r.estado = 'pendiente' OR r.estado = 'confirmada') AND h.piso = 2
+ORDER BY h.piso, h.numero;
+\echo '      (La versión a) cuela la reservación pendiente de la habitación 101, que está en el piso 1)'
 
 \echo '\n[8.5] NOT se evalúa antes que AND: "no canceladas y con saldo"'
 SELECT s.codigo, r.estado, s.saldo

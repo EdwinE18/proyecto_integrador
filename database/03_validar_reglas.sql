@@ -40,6 +40,11 @@ BEGIN
   ELSE RAISE NOTICE '❌ FALLA  %  %', rpad(regla, 6), descripcion; END IF;
 END $$ LANGUAGE plpgsql;
 
+-- Un segundo hotel SOLO para estas pruebas (se borra con el ROLLBACK): sirve para probar RN-08 y RN-75
+INSERT INTO hoteles (id, nombre, ciudad) VALUES ('22222222-2222-2222-2222-222222222222', 'Hotel de prueba', 'Tuxtla Gutiérrez');
+INSERT INTO tipos_habitacion (id, hotel_id, nombre, precio_base) VALUES ('a0000000-0000-0000-0000-0000000000ff', '22222222-2222-2222-2222-222222222222', 'Prueba', 900);
+INSERT INTO habitaciones (hotel_id, tipo_id, numero) VALUES ('22222222-2222-2222-2222-222222222222', 'a0000000-0000-0000-0000-0000000000ff', 'X1');
+
 -- Datos de apoyo: habitación 202 de Posada Los Arcos, fechas lejanas para no chocar con nada
 CREATE TEMP TABLE ctx AS
 SELECT h.id AS hab, h.hotel_id AS hotel,
@@ -227,7 +232,7 @@ BEGIN
   PERFORM pg_temp.debe_cumplir('RN-86', 'Recepción sí consulta el resumen de su hotel',
     $q$asistente.resumen_dia('9000001') LIKE '%Posada Los Arcos%'$q$);
   PERFORM pg_temp.debe_cumplir('RN-75', 'Recepción no ve el otro hotel aunque lo pida',
-    $q$asistente.resumen_dia('9000001', 'Cañón') = 'No encontré ese hotel.'$q$);
+    $q$asistente.resumen_dia('9000001', 'prueba') = 'No encontré ese hotel.'$q$);
   PERFORM pg_temp.debe_cumplir('RN-87', 'Recepción no ve ingresos',
     $q$asistente.ingresos('9000001', CURRENT_DATE - 30, CURRENT_DATE) LIKE '⛔%'$q$);
   PERFORM pg_temp.debe_cumplir('RN-87', 'El administrador sí ve ingresos',

@@ -3,7 +3,7 @@ import { useSesion } from '../context/SesionContext.jsx';
 import { useAccion } from '../hooks/useAccion.js';
 import { Aviso, Boton, Campo } from '../components/comunes.jsx';
 
-const DEMO = ['recepcion@losarcos.mx', 'limpieza@losarcos.mx', 'gerente@boutiquecanon.mx', 'admin@pms.local'];
+const DEMO = ['recepcion@losarcos.mx', 'limpieza@losarcos.mx', 'gerente@losarcos.mx', 'admin@pms.local'];
 
 export default function Login() {
   const { iniciarSesion, aviso } = useSesion();
