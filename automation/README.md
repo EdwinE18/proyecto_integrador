@@ -4,7 +4,8 @@
 |---|---|---|
 | **PostgreSQL** | `database/09_notificaciones.sql` | Arma los mensajes y decide a quién van (RN-81, 82, 84, 85) |
 | **n8n** | `automation/n8n/notificaciones-telegram.json` | Cada minuto envía los avisos pendientes |
-| **Node-RED** | `automation/node-red/flows.json` | El bot conversa con el huésped y manda el resumen de las 8:00 a recepción |
+| **Node-RED** | `automation/node-red/flows.json` | El bot conversa con el huésped (ve precios, reserva, paga) y manda el resumen de las 8:00 a recepción |
+| **PostgreSQL** | `database/14_bot_huespedes.sql` | La conversación del bot de huéspedes: menú, disponibilidad, reservación y pago simulado (RN-89 a RN-93) |
 
 ```
 backend ──► eventos_dominio ──► n8n (cada minuto) ──► Telegram ──► huésped / recepción
@@ -21,8 +22,22 @@ Necesitas: el **token** y el **usuario** de tu bot (los que te dio @BotFather; e
 ## Paso 1 · Funciones en la base de datos
 ```bash
 cd ~/proyectoI/hotel-pms
-psql -h localhost -U pms_admin -d hotel_pms -f database/09_notificaciones.sql
+PGPASSWORD=PI123 psql -h localhost -U pms_admin -d hotel_pms -f database/09_notificaciones.sql
+PGPASSWORD=PI123 psql -h localhost -U pms_admin -d hotel_pms -f database/14_bot_huespedes.sql
 ```
+
+**Qué puede hacer el huésped con el bot** (rol de cliente):
+
+| Escribe | El bot |
+|---|---|
+| `hola` o `menu` | Muestra el menú de 4 opciones |
+| `1` | Lista los tipos de habitación con capacidad y precio |
+| `2` | Pregunta llegada, salida (o noches) y personas; muestra lo libre con el total; pide nombre y teléfono; reserva |
+| `3` | Muestra sus reservaciones |
+| `4` | Le deja elegir: **efectivo en el mostrador** o **pago simulado** (anticipo del 30 % o todo) |
+| su código de 8 caracteres | Vincula el chat a esa reservación para recibir avisos |
+
+El pago es una **simulación**: no se cobra dinero real. Queda registrado con referencia `SIMULADO-…` y, si cubre el anticipo, la reservación se confirma sola. Recepción recibe aviso de cada reservación y pago hechos por el bot.
 
 ## Paso 2 · Node-RED (el bot que conversa)
 ```bash
@@ -44,7 +59,7 @@ node-red        # déjalo corriendo; abre http://localhost:1880
    - **User:** `pms_admin`
    - **Password:** `PI123`
 4. Botón rojo **Deploy**.
-5. **Prueba:** escríbele `hola` a tu bot en Telegram. Debe contestar *"¡Hola…! Soy el asistente del hotel…"*.
+5. **Prueba:** escríbele `hola` a tu bot en Telegram. Debe contestar con el menú: *"¡Hola…! 👋 Soy el asistente de Posada Los Arcos…"*. Luego escribe `2` y haz una reservación completa.
 
 ## Paso 3 · Chat de recepción (avisos de limpieza y resumen diario)
 1. En Telegram crea un grupo, por ejemplo *"Recepción Posada Los Arcos"*, y agrega a tu bot.

@@ -33,8 +33,8 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Pagos | 6 | 0 | 0 | 1 |
 | Tarifas | 4 | 0 | 0 | 0 |
 | Usuarios, seguridad y administración | 10 | 0 | 0 | 0 |
-| Automatización, notificaciones y asistente | 8 | 0 | 0 | 1 |
-| **Total** | **60** | **0** | **0** | **3** |
+| Automatización, notificaciones y bots | 13 | 0 | 0 | 1 |
+| **Total** | **65** | **0** | **0** | **3** |
 
 ---
 
@@ -412,6 +412,24 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Ahorro de tokens:** cada herramienta regresa un texto corto ya resumido, y la IA recibe la base de datos resumida por `scripts/esquema_compacto.py` (≈ 650 tokens en lugar de ≈ 17,000 del SQL completo).
 - **Dónde se aplica:** permisos en `12_asistente.sql` + flujo `automation/n8n/asistente-personal.json`.
 
+### RN-89 · El bot de huéspedes atiende al cliente por Telegram ✅ *(nueva)*
+- **Regla:** cualquier persona puede escribirle al bot del hotel y, con un menú numerado, **ver las habitaciones y precios**, **consultar disponibilidad y reservar**, **ver sus reservaciones** y **elegir cómo pagar**. Entiende fechas como las escribe la gente ("20/12", "20 de diciembre", "mañana") y el número de noches. Se reservan máximo 30 noches y hasta un año antes; no se aceptan fechas pasadas (RN-14).
+- **Dónde se aplica:** `fn_bot_conversar()` en `database/14_bot_huespedes.sql`. La conversación de cada chat (en qué paso va) se guarda en la tabla `bot_conversaciones` y se olvida tras 30 minutos sin actividad. Node-RED no cambia: sigue llamando a `fn_bot_responder()`.
+
+### RN-90 · Lo que reserva el bot cumple las mismas reglas que recepción ✅ *(nueva)*
+- **Regla:** el bot solo ofrece tipos de habitación con cuartos libres, en servicio y con capacidad para las personas indicadas (RN-11, RN-13), con el total calculado noche por noche con temporadas (RN-61). La reservación queda **pendiente**, con canal `telegram`, y el chat queda vinculado al huésped para recibir avisos.
+- **Concurrencia:** si dos personas apartan el último cuarto al mismo tiempo, la restricción `EXCLUDE` (RN-01) rechaza a la segunda; el bot prueba otro cuarto del mismo tipo o le pide otras fechas.
+
+### RN-91 · El bot nunca revela datos de otro huésped ✅ *(nueva)*
+- **Regla:** si el teléfono que escribe la persona ya existe, el bot solo reutiliza ese registro cuando **también coincide el nombre**; si no, crea un huésped nuevo. Así nadie puede escribir un teléfono ajeno para ver el nombre o las reservaciones de otra persona.
+
+### RN-92 · El pago por el bot es simulado ✅ *(nueva)*
+- **Regla:** el sistema no maneja dinero real. El huésped elige: **pagar en efectivo en el mostrador al llegar** (la reservación queda apartada y recepción la confirma) o **simular el pago** del anticipo o del total para la demostración. El pago simulado se registra como cualquier pago, con referencia `SIMULADO-XXXXXX`, respetando RN-54 y RN-55; si cubre el anticipo, la reservación pasa a **confirmada**.
+- **Anticipo:** 30 % del total, redondeado hacia arriba a la centena, mientras el hotel define su política (RN-53).
+
+### RN-93 · Recepción se entera de lo que hace el bot ✅ *(nueva)*
+- **Regla:** cada reservación y cada pago simulado hechos por el bot generan un evento (`reservacion.por_bot`, `pago.por_bot`) que n8n envía al grupo de recepción.
+
 
 ---
 
@@ -423,7 +441,7 @@ cd backend && npm test
 ```
 Son 211 pruebas. Cubren las reglas de reservaciones, precios, temporadas, reportes, huéspedes, habitaciones, pagos, estancias, seguridad (permisos por rol, sesiones, bloqueo de intentos) y administración del personal usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
 
-**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55, RN-60, RN-70, RN-71, RN-75, RN-81, RN-85 y el asistente RN-86 a RN-88 (65 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y los archivos `05` a `09` y `12`:
+**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55, RN-60, RN-70, RN-71, RN-75, RN-81, RN-85, el asistente RN-86 a RN-88 y el bot de huéspedes RN-89 a RN-93 (72 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y los archivos `05` a `09`, `12` y `14`:
 ```bash
 psql -h localhost -U pms_admin -d hotel_pms < database/03_validar_reglas.sql 2>&1 | sed 's/NOTICE:  //'
 ```
@@ -450,3 +468,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 | 2026-11-04 | Notificaciones por Telegram con n8n y Node-RED: RN-81, RN-82 + nuevas RN-84, RN-85. Total: 54 reglas, **51 implementadas** y 3 preguntas para el hotel | Edwin |
 | 2026-11-09 | Funciones de administración y gerencia: tarifas (nuevas RN-62, 63), personal (nuevas RN-76, 77), reportes (RN-78), datos del hotel (RN-79) y asistente de IA para el personal (RN-86, 87, 88). Total: 63 reglas, **60 implementadas** y 3 preguntas para el hotel | Edwin |
 | 2026-11-09 | Datos de prueba con un solo hotel (Posada Los Arcos) ampliado a 12 habitaciones y 4 tipos. Migración `13_un_solo_hotel.sql` para bases existentes | Edwin |
+| 2026-11-09 | Bot de huéspedes (rol de cliente por Telegram): menú, disponibilidad, reservación y pago simulado o en efectivo (nuevas RN-89 a RN-93). Total: 68 reglas, **65 implementadas** | Edwin |

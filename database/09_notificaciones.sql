@@ -88,6 +88,17 @@ BEGIN
                         'Tu habitación es la ', r.numero, '. Tu salida es el ', fn_fecha(r.fecha_salida),
                         ' a las ', r.hora_salida, ' hrs.', E'\n',
                         'Escríbenos por aquí si necesitas algo.');
+    WHEN 'reservacion.por_bot' THEN                            -- RN-93: aviso a recepción
+      chat_id := r.chat_hotel;
+      mensaje := CONCAT('📲 Nueva reservación por Telegram', E'\n',
+                        r.codigo, ' · ', r.nombre, ' · hab. ', r.numero, E'\n',
+                        fn_fecha(r.fecha_entrada), ' al ', fn_fecha(r.fecha_salida), ' · total ', fn_pesos(r.total), E'\n',
+                        'Queda pendiente hasta que se pague el anticipo.');
+    WHEN 'pago.por_bot' THEN
+      chat_id := r.chat_hotel;
+      mensaje := CONCAT('💳 Pago simulado por Telegram: ', fn_pesos((ev.payload->>'monto')::numeric),
+                        ' · ', r.codigo, ' (', r.nombre, ')', E'\n',
+                        'Referencia ', ev.payload->>'referencia', ' · saldo ', fn_pesos(r.saldo));
     WHEN 'estancia.check_out' THEN
       chat_id := r.chat_hotel;                                 -- RN-43: aviso a limpieza
       mensaje := CONCAT('🧹 La habitación ', r.numero, ' quedó libre y está lista para limpiar.', E'\n',
@@ -166,7 +177,7 @@ $$ LANGUAGE plpgsql;
 --   /estado                         → muestra sus reservaciones activas
 --   /miid                           → muestra el número de chat (para configurar recepción)
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_bot_responder(p_texto TEXT, p_chat TEXT, p_nombre TEXT DEFAULT NULL)
+CREATE OR REPLACE FUNCTION fn_bot_codigo(p_texto TEXT, p_chat TEXT, p_nombre TEXT DEFAULT NULL)
 RETURNS TEXT AS $$
 DECLARE
   v_texto  TEXT := TRIM(COALESCE(p_texto, ''));
@@ -213,6 +224,21 @@ BEGIN
 
   UPDATE huespedes SET telegram_chat_id = p_chat WHERE id = r.huesped_id;
   RETURN CONCAT('¡Listo, ', r.nombre, '! ✅ Desde ahora recibirás aquí los avisos de tu reservación.', E'\n\n', r.mensaje);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Node-RED siempre llama a esta función. Si está instalado el bot de reservaciones
+-- (14_bot_huespedes.sql), la conversación completa la lleva fn_bot_conversar();
+-- si no, solo se vinculan códigos, /estado y /miid.
+CREATE OR REPLACE FUNCTION fn_bot_responder(p_texto TEXT, p_chat TEXT, p_nombre TEXT DEFAULT NULL)
+RETURNS TEXT AS $$
+DECLARE v TEXT;
+BEGIN
+  IF to_regprocedure('fn_bot_conversar(text,text,text)') IS NOT NULL THEN
+    EXECUTE 'SELECT fn_bot_conversar($1, $2, $3)' INTO v USING p_texto, p_chat, p_nombre;
+    RETURN v;
+  END IF;
+  RETURN fn_bot_codigo(p_texto, p_chat, p_nombre);
 END;
 $$ LANGUAGE plpgsql;
 

@@ -40,6 +40,7 @@ PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/07_reglas_huespedes.sql"
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/08_reglas_usuarios.sql"
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/09_notificaciones.sql"
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/14_bot_huespedes.sql"
 
 echo "▶ Asistente del personal (n8n): usuario de solo consulta y funciones seguras..."
 ASIS_PASS="${ASIS_PASS:-Asistente123}"

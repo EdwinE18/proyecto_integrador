@@ -55,7 +55,7 @@ FROM habitaciones h
 WHERE h.numero = '202' AND h.hotel_id = '11111111-1111-1111-1111-111111111111';
 
 DO $$
-DECLARE c ctx%ROWTYPE;
+DECLARE c ctx%ROWTYPE; v_msg TEXT;
   ins text := 'INSERT INTO reservaciones (hotel_id, huesped_id, habitacion_id, fecha_entrada, fecha_salida, num_adultos, precio_noche, total, estado) VALUES (%L, %L, %L, %L, %L, %s, 1000, 1000, %L)';
 BEGIN
   SELECT * INTO c FROM ctx;
@@ -249,6 +249,39 @@ BEGIN
     PERFORM pg_temp.debe_cumplir('RN-88', 'El usuario de n8n solo ejecuta las herramientas del asistente',
       $q$has_function_privilege('asistente_ro', 'asistente.resumen_dia(text, text)', 'EXECUTE')
          AND NOT has_function_privilege('asistente_ro', 'asistente._quien(text, boolean)', 'EXECUTE')$q$);
+  END IF;
+
+  IF to_regprocedure('fn_bot_conversar(text,text,text)') IS NOT NULL THEN
+    RAISE NOTICE '';
+    RAISE NOTICE '==== BOT DE HUÉSPEDES (requiere 14_bot_huespedes.sql) ====';
+    PERFORM pg_temp.debe_cumplir('RN-89', 'El bot entiende "20 de diciembre", "20/12/2030" y "2030-12-20"',
+      $q$fn_bot_fecha('20/12/2030') = DATE '2030-12-20' AND fn_bot_fecha('2030-12-20') = DATE '2030-12-20'
+         AND EXTRACT(MONTH FROM fn_bot_fecha('20 de diciembre')) = 12$q$);
+    PERFORM pg_temp.debe_cumplir('RN-89', 'El bot rechaza fechas que no existen (31/02)',
+      $q$fn_bot_fecha('31/02/2031') IS NULL$q$);
+    -- Una reservación completa, como la haría un huésped: el teléfono es de Ana, pero el nombre no
+    FOREACH v_msg IN ARRAY ARRAY['hola', '2', TO_CHAR(CURRENT_DATE + 200, 'DD/MM/YYYY'), '2', '2', '1', 'Carlos Nava Ruiz',
+                                 (SELECT telefono FROM huespedes WHERE id = 'b0000000-0000-0000-0000-000000000001'), 'si'] LOOP
+      PERFORM fn_bot_responder(v_msg, 'bot-prueba', 'Prueba');
+    END LOOP;
+    PERFORM pg_temp.debe_cumplir('RN-90', 'El huésped reserva solo: queda pendiente, canal telegram y con su chat',
+      $q$EXISTS (SELECT 1 FROM reservaciones r JOIN huespedes h ON h.id = r.huesped_id
+                 WHERE r.fecha_entrada = CURRENT_DATE + 200 AND r.fecha_salida = CURRENT_DATE + 202 AND r.estado = 'pendiente'
+                   AND r.canal = 'telegram' AND h.telegram_chat_id = 'bot-prueba')$q$);
+    PERFORM pg_temp.debe_cumplir('RN-91', 'Un teléfono ajeno con otro nombre NO usa el registro de otra persona',
+      $q$(SELECT h.id FROM reservaciones r JOIN huespedes h ON h.id = r.huesped_id WHERE r.fecha_entrada = CURRENT_DATE + 200)
+         <> 'b0000000-0000-0000-0000-000000000001'$q$);
+    PERFORM pg_temp.debe_cumplir('RN-93', 'Recepción recibe aviso de la reservación hecha por el bot',
+      $q$EXISTS (SELECT 1 FROM eventos_dominio e JOIN reservaciones r ON r.id = e.agregado_id
+                 WHERE e.tipo = 'reservacion.por_bot' AND r.fecha_entrada = CURRENT_DATE + 200)$q$);
+    PERFORM fn_bot_responder('2', 'bot-prueba', 'Prueba');      -- paga el anticipo simulado
+    PERFORM pg_temp.debe_cumplir('RN-92', 'El pago simulado registra el anticipo (30 %) y confirma la reservación',
+      $q$EXISTS (SELECT 1 FROM reservaciones r JOIN pagos p ON p.reservacion_id = r.id
+                 WHERE r.fecha_entrada = CURRENT_DATE + 200 AND r.estado = 'confirmada'
+                   AND p.referencia LIKE 'SIMULADO-%' AND p.monto = fn_bot_anticipo(r.total) AND p.es_anticipo)$q$);
+    PERFORM pg_temp.debe_cumplir('RN-01', 'El bot no ofrece un tipo de habitación si ya no queda ninguno libre',
+      $q$NOT EXISTS (SELECT 1 FROM JSONB_ARRAY_ELEMENTS(fn_bot_opciones(CURRENT_DATE + 200, CURRENT_DATE + 202, 1, 0)) o
+                     WHERE (o->>'libres')::int > (SELECT COUNT(*) FROM habitaciones h WHERE h.tipo_id = (o->>'tipo_id')::uuid))$q$);
   END IF;
 
   RAISE NOTICE '';

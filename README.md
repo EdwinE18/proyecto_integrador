@@ -103,7 +103,7 @@ hotel-pms/
 │   ├── n8n/asistente-personal.json        # Asistente con IA para recepción, gerencia y admin
 │   └── node-red/flows.json                # Bot que conversa + resumen diario a las 8:00
 ├── scripts/esquema_compacto.py            # Resume la BD para la IA (≈ 650 tokens en vez de ≈ 17,000)
-├── database/  01_schema.sql … 12_asistente.sql  setup_db.sh
+├── database/  01_schema.sql … 14_bot_huespedes.sql  setup_db.sh
 └── docs/{diagramas,investigacion}
 ```
 
@@ -269,7 +269,7 @@ psql -h localhost -U pms_admin -d hotel_pms -f database/11_consultas_evaluacion.
 1. El backend guarda cada evento importante en `eventos_dominio`: reservación confirmada o cancelada, pago, check-in, check-out, cuarto a mantenimiento.
 2. **PostgreSQL** arma el texto y decide a quién va (`database/09_notificaciones.sql`, con `CONCAT`, `STRING_AGG`, `TO_CHAR`).
 3. **n8n** revisa cada minuto y lo envía por Telegram. Si falla, lo reintenta hasta 5 veces, sin duplicar mensajes.
-4. **Node-RED** es el bot que conversa: el huésped manda su código de reservación y queda vinculado. A las 8:00 envía el resumen del día al grupo de recepción.
+4. **Node-RED** es el bot de huéspedes (rol de cliente): con un menú, el huésped ve habitaciones y precios, consulta disponibilidad, **reserva** y elige pagar en efectivo en el mostrador o con un **pago simulado** (`database/14_bot_huespedes.sql`, RN-89 a RN-93). A las 8:00 envía el resumen del día al grupo de recepción.
 5. **Asistente del personal (n8n + IA Gemini):** otro bot, solo para recepción, gerencia y administración. Se le pregunta en lenguaje natural (*"¿qué tengo libre del 20 al 23 para 2?"*, *"¿cuánto cobramos esta semana?"*) y contesta usando funciones seguras de la BD (`database/12_asistente.sql`): la IA no escribe SQL, solo consulta y respeta el rol y el hotel de quien pregunta (RN-86 a RN-88).
 
 La configuración paso a paso está en **[automation/README.md](automation/README.md)**.
