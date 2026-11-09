@@ -1,0 +1,569 @@
+{
+  "name": "PMS · Asistente del personal (IA)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "6a16ec49-a007-45a5-80bd-942a1975274d",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -560,
+        0
+      ],
+      "webhookId": "15b7d2a1-32e4-413f-a8e8-b933bc0b6337",
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Bot del personal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM asistente.identificar($1);",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id] }}"
+        }
+      },
+      "id": "9a91ca58-860c-4e46-a9bc-b269851b05bc",
+      "name": "Identificar",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -340,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "b98b2626-ca30-4625-a78e-819a47f1da65",
+              "leftValue": "={{ $json.autorizado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2696d04e-0d1d-477a-b106-09fdd4fa87a1",
+      "name": "¿Es personal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
+        "options": {
+          "systemMessage": "=Eres el asistente interno del PMS hotelero. Hablas con {{ $('Identificar').item.json.nombre }}, rol: {{ $('Identificar').item.json.rol }}, hotel: {{ $('Identificar').item.json.hotel }}.\nHoy es {{ $('Identificar').item.json.hoy }}.\n\nReglas:\n- Responde en español, breve y claro (máximo 10 líneas), sin tablas ni markdown.\n- Usa SIEMPRE una herramienta para obtener datos. Nunca inventes cifras, nombres ni códigos.\n- Si la herramienta responde con ⛔, repite ese mensaje tal cual y no insistas.\n- Solo consultas: no puedes crear, cambiar ni cancelar nada. Para eso, indica que se haga en el sistema web.\n- Convierte fechas como \"mañana\" o \"el viernes\" a AAAA-MM-DD usando la fecha de hoy. La fecha de salida no cuenta como noche.\n- Si falta un dato necesario (por ejemplo, las fechas), pregúntalo en una sola línea.\n- Si te preguntan algo que no tiene que ver con el hotel, di amablemente que solo ayudas con el hotel.\n\nBase de datos (solo como referencia, no escribes SQL):\n{{ $('Identificar').item.json.esquema }}",
+          "maxIterations": 5
+        }
+      },
+      "id": "dddaf9aa-a792-4700-b82c-01e3475b0d4f",
+      "name": "Asistente IA",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        140,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {
+          "temperature": 0.2,
+          "maxOutputTokens": 600
+        }
+      },
+      "id": "15011525-3dc1-46cc-8af4-36102385c55c",
+      "name": "Gemini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        200
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Google Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "contextWindowLength": 6
+      },
+      "id": "79aebfdb-d444-4253-8ebd-392c14a2685f",
+      "name": "Memoria (6 mensajes)",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Resumen de HOY: ocupación, llegadas, salidas con saldo, cuartos por limpiar y reservaciones sin confirmar.",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.resumen_dia($1, $2) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id, $fromAI('hotel', `Nombre o parte del nombre del hotel. Cadena vacía para el hotel del usuario o todos.`, 'string')] }}"
+        }
+      },
+      "id": "a3c4e040-fdba-41aa-8e99-8ec68a4a1250",
+      "name": "resumen_dia",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Habitaciones libres entre dos fechas con el precio TOTAL ya calculado (incluye temporadas).",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.disponibilidad($1, $2::date, $3::date, $4::int, $5::int, $6) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id, $fromAI('entrada', `Fecha de entrada AAAA-MM-DD`, 'string'), $fromAI('salida', `Fecha de salida AAAA-MM-DD (no cuenta como noche)`, 'string'), $fromAI('adultos', `Número de adultos, 1 si no lo dicen`, 'number'), $fromAI('ninos', `Número de niños, 0 si no lo dicen`, 'number'), $fromAI('hotel', `Nombre o parte del nombre del hotel. Cadena vacía para el hotel del usuario o todos.`, 'string')] }}"
+        }
+      },
+      "id": "19932047-63b9-448b-96ab-c22902c08e61",
+      "name": "disponibilidad",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        380,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Detalle de UNA reservación por su código de 8 caracteres: huésped, fechas, estado, total, pagos y saldo.",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.reservacion($1, $2) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id, $fromAI('codigo', `Código de la reservación, ej. 5D48D61C`, 'string')] }}"
+        }
+      },
+      "id": "12239d0b-151c-4915-8a3c-d662ca90133c",
+      "name": "reservacion",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        520,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Busca huéspedes por nombre, teléfono o correo (máximo 5) y lista sus reservaciones.",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.buscar_huesped($1, $2) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id, $fromAI('texto', `Nombre, teléfono o correo a buscar`, 'string')] }}"
+        }
+      },
+      "id": "923b4ac7-ed37-4dfe-92af-1f680c289d57",
+      "name": "buscar_huesped",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Pendientes: reservaciones sin confirmar, huéspedes hospedados con saldo y cuartos no disponibles.",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.pendientes($1, $2) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id, $fromAI('hotel', `Nombre o parte del nombre del hotel. Cadena vacía para el hotel del usuario o todos.`, 'string')] }}"
+        }
+      },
+      "id": "0855208a-3df1-4da4-9ef8-bf93b827b0e3",
+      "name": "pendientes",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        800,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "SOLO admin/gerente. Dinero cobrado en un periodo: total, por método de pago y por hotel, y lo que falta por cobrar.",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.ingresos($1, $2::date, $3::date, $4) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id, $fromAI('desde', `Fecha inicial AAAA-MM-DD`, 'string'), $fromAI('hasta', `Fecha final AAAA-MM-DD (incluida)`, 'string'), $fromAI('hotel', `Nombre o parte del nombre del hotel. Cadena vacía para el hotel del usuario o todos.`, 'string')] }}"
+        }
+      },
+      "id": "340a4834-2947-4bcd-943e-bf03b33feb88",
+      "name": "ingresos",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        940,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "SOLO admin/gerente. Ocupación %, tarifa promedio (ADR), RevPAR, reservaciones por estado y canal, y motivos de cancelación de un periodo.",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.estadisticas($1, $2::date, $3::date, $4) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id, $fromAI('desde', `Fecha inicial AAAA-MM-DD`, 'string'), $fromAI('hasta', `Fecha final AAAA-MM-DD (incluida)`, 'string'), $fromAI('hotel', `Nombre o parte del nombre del hotel. Cadena vacía para el hotel del usuario o todos.`, 'string')] }}"
+        }
+      },
+      "id": "229396c4-53dc-4654-9a9b-f02899ef3076",
+      "name": "estadisticas",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        1080,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "SOLO admin/gerente. Últimos avisos de Telegram que no se pudieron enviar.",
+        "operation": "executeQuery",
+        "query": "SELECT asistente.avisos_fallidos($1) AS respuesta;",
+        "options": {
+          "queryReplacement": "={{ [$('Telegram Trigger').item.json.message.chat.id] }}"
+        }
+      },
+      "id": "f33e9c54-ce51-4301-92a5-08e4d9b08de7",
+      "name": "avisos_fallidos",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        1220,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "PMS Asistente (solo lectura)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "53b4e98f-eb17-4348-b4ac-cee34d206e27",
+      "name": "Responder",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        -120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Bot del personal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.mensaje }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "79df2e1b-5dda-4a63-bdb4-6ac0ae5413e0",
+      "name": "No autorizado",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        140,
+        80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Bot del personal"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Asistente del personal (admin y reservaciones)\n1. Usa un bot DISTINTO al de huéspedes (Node-RED ya usa ese).\n2. Credencial Postgres con el usuario **asistente_ro** (solo ejecuta funciones `asistente.*`).\n3. Credencial de Google Gemini (API key gratis en aistudio.google.com).\n4. El Telegram Trigger necesita URL pública: `cloudflared tunnel --url http://localhost:5678` y arrancar n8n con `WEBHOOK_URL=https://...trycloudflare.com/`.\n5. El número de chat lo pone n8n (no la IA): nadie puede hacerse pasar por otro usuario.\n\nVer automation/README.md",
+        "height": 300,
+        "width": 520
+      },
+      "id": "f65eab14-fca0-4a09-8d27-4ab05ec6125b",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        -420
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Identificar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identificar": {
+      "main": [
+        [
+          {
+            "node": "¿Es personal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es personal?": {
+      "main": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No autorizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asistente IA": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria (6 mensajes)": {
+      "ai_memory": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "resumen_dia": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "disponibilidad": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reservacion": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_huesped": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "pendientes": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ingresos": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "estadisticas": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "avisos_fallidos": {
+      "ai_tool": [
+        [
+          {
+            "node": "Asistente IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

@@ -10,8 +10,10 @@ const PERMISOS = {
   'habitaciones:ver':        ['admin', 'gerente', 'recepcion', 'limpieza'],
   'habitaciones:limpieza':   ['admin', 'gerente', 'recepcion', 'limpieza'], // limpieza ⇄ disponible
   'habitaciones:servicio':   ['admin', 'gerente', 'recepcion'],   // mantenimiento / fuera de servicio
-  'tarifas:gestionar':       ['admin', 'gerente'],
-  'usuarios:gestionar':      ['admin'],
+  'tarifas:gestionar':       ['admin', 'gerente'],               // precios base y temporadas
+  'reportes:ver':            ['admin', 'gerente'],               // ocupación, ingresos, canales (RN-78)
+  'hotel:configurar':        ['admin', 'gerente'],               // datos de contacto, horarios y Telegram del hotel
+  'usuarios:gestionar':      ['admin', 'gerente'],               // el gerente solo maneja recepción y limpieza (RN-76)
   'explorador:ver':          ['admin'],
 };
 

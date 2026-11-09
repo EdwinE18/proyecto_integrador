@@ -4,6 +4,7 @@ export class UsuarioRepository {
   async buscarPorId(id) { throw new Error('No implementado'); }
   async listar(hotelId) { throw new Error('No implementado'); }
   async guardar(usuario, passwordHash) { throw new Error('No implementado'); }
+  async actualizar(usuario) { throw new Error('No implementado'); }
   async cambiarPassword(id, passwordHash) { throw new Error('No implementado'); }
   async registrarAcceso(id) { throw new Error('No implementado'); }
 }

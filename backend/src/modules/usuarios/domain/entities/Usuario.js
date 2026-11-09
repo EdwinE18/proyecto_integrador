@@ -4,7 +4,7 @@ import { ROLES, permisosDe } from '../permisos.js';
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export class Usuario {
-  constructor({ id, hotelId = null, nombre, apellidos, email, rol, activo = true, ultimoAcceso = null }) {
+  constructor({ id, hotelId = null, nombre, apellidos, email, rol, activo = true, ultimoAcceso = null, telegramChatId = null }) {
     this.id = id;
     this.hotelId = hotelId;
     this.nombre = typeof nombre === 'string' ? nombre.trim() : '';
@@ -13,6 +13,10 @@ export class Usuario {
     this.rol = rol;
     this.activo = activo;
     this.ultimoAcceso = ultimoAcceso;
+    this.telegramChatId = telegramChatId == null || String(telegramChatId).trim() === '' ? null : String(telegramChatId).trim();
+    // RN-86: el chat de Telegram (para el asistente) es un número que da el propio bot con /miid
+    if (this.telegramChatId !== null && !/^-?\d{5,20}$/.test(this.telegramChatId))
+      throw new AuthError('El chat de Telegram debe ser un número (el bot te lo da con /miid)', 'RN-86', 400);
     if (!this.nombre || !this.apellidos) throw new AuthError('Nombre y apellidos son obligatorios', 'RN-75', 400);
     if (!EMAIL.test(this.email)) throw new AuthError('Correo inválido', 'RN-75', 400);
     if (!ROLES.includes(rol)) throw new AuthError(`Rol inválido. Usa: ${ROLES.join(', ')}`, 'RN-72', 400);

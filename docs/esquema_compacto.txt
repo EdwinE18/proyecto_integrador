@@ -1,0 +1,28 @@
+BD hotel_pms (PostgreSQL). Dinero en MXN. Fechas AAAA-MM-DD; la salida no cuenta como noche.
+Tablas:
+- estancias(reservacion_id →reservaciones, check_in_real fecha-hora, check_out_real fecha-hora, usuario_check_in →usuarios, usuario_check_out →usuarios, placas_vehiculo texto, observaciones texto)
+- habitaciones(hotel_id →hoteles, tipo_id →tipos_habitacion, numero texto, piso entero, estado estado_habitacion, notas texto, activo sí/no)
+- hoteles(nombre texto, tipo texto, rfc texto, direccion texto, ciudad texto, estado texto, telefono texto, email texto, hora_check_in hora, hora_check_out hora, activo sí/no)
+- huespedes(nombre texto, apellidos texto, email texto, telefono texto, tipo_documento texto, nacionalidad texto, ciudad_origen texto, notas texto)
+- pagos(reservacion_id →reservaciones, monto dinero, metodo metodo_pago, referencia texto, es_anticipo sí/no, registrado_por →usuarios, fecha_pago fecha-hora)
+- reservaciones(codigo texto, hotel_id →hoteles, huesped_id →huespedes, habitacion_id →habitaciones, fecha_entrada fecha, fecha_salida fecha, noches entero, num_adultos entero, num_ninos entero, precio_noche dinero, total dinero, estado estado_reservacion, canal canal_reservacion, solicitudes_especiales texto, motivo_cancelacion texto, creado_por →usuarios)
+- tarifas_temporada(tipo_id →tipos_habitacion, nombre texto, fecha_inicio fecha, fecha_fin fecha, precio_noche dinero)
+- tipos_habitacion(hotel_id →hoteles, nombre texto, descripcion texto, capacidad_adultos entero, capacidad_ninos entero, precio_base dinero, activo sí/no)
+- usuarios(hotel_id →hoteles, nombre texto, apellidos texto, email texto, rol rol_usuario, activo sí/no, ultimo_acceso fecha-hora)
+Valores:
+- canal_reservacion: mostrador,telefono,whatsapp,telegram,web,ota
+- estado_habitacion: disponible,ocupada,limpieza,mantenimiento,fuera_servicio
+- estado_notificacion: pendiente,enviada,fallida
+- estado_reservacion: pendiente,confirmada,check_in,check_out,cancelada,no_show
+- metodo_pago: efectivo,tarjeta,transferencia,deposito
+- rol_usuario: admin,gerente,recepcion,limpieza
+Reglas: no hay sobreventa (la BD lo impide); saldo = total - pagos; recepción no ve ingresos.
+Herramientas (todas reciben el chat automáticamente):
+- avisos_fallidos()
+- buscar_huesped(texto text)
+- disponibilidad(entrada date, salida date, adultos integer=1, ninos integer=0, hotel text=NULL)
+- estadisticas(desde date, hasta date, hotel text=NULL)
+- ingresos(desde date, hasta date, hotel text=NULL)
+- pendientes(hotel text=NULL)
+- reservacion(codigo text)
+- resumen_dia(hotel text=NULL)

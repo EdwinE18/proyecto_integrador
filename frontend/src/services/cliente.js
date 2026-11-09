@@ -31,3 +31,4 @@ const qs = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== 
 export const get = (ruta, query) => http('GET', query ? `${ruta}?${qs(query)}` : ruta);
 export const post = (ruta, cuerpo) => http('POST', ruta, cuerpo ?? {});
 export const patch = (ruta, cuerpo) => http('PATCH', ruta, cuerpo ?? {});
+export const del = (ruta) => http('DELETE', ruta);

@@ -24,7 +24,10 @@ describe('RN-72 permisos por rol', () => {
     ['habitaciones:limpieza',   { admin: 1, gerente: 1, recepcion: 1, limpieza: 1 }],
     ['habitaciones:servicio',   { admin: 1, gerente: 1, recepcion: 1, limpieza: 0 }],
     ['tarifas:gestionar',       { admin: 1, gerente: 1, recepcion: 0, limpieza: 0 }],
-    ['usuarios:gestionar',      { admin: 1, gerente: 0, recepcion: 0, limpieza: 0 }],
+    ['usuarios:gestionar',      { admin: 1, gerente: 1, recepcion: 0, limpieza: 0 }],
+    ['reportes:ver',            { admin: 1, gerente: 1, recepcion: 0, limpieza: 0 }],
+    ['hotel:configurar',        { admin: 1, gerente: 1, recepcion: 0, limpieza: 0 }],
+    ['explorador:ver',          { admin: 1, gerente: 0, recepcion: 0, limpieza: 0 }],
   ];
   for (const [permiso, roles] of tabla)
     for (const [rol, si] of Object.entries(roles))

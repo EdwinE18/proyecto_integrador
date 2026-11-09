@@ -10,7 +10,11 @@ const MENU = [
   { a: '/reservaciones', ico: '📅', texto: 'Reservaciones',      permiso: 'reservaciones:gestionar' },
   { a: '/habitaciones',  ico: '🛏️', texto: 'Habitaciones',       permiso: 'habitaciones:ver' },
   { a: '/huespedes',     ico: '👤', texto: 'Huéspedes',          permiso: 'huespedes:gestionar' },
-  { a: '/usuarios',      ico: '🔑', texto: 'Usuarios',           permiso: 'usuarios:gestionar' },
+  // Administración: admin y gerente
+  { a: '/reportes',      ico: '📊', texto: 'Reportes',           permiso: 'reportes:ver', grupo: 'Administración' },
+  { a: '/configuracion', ico: '🏷️', texto: 'Hotel y tarifas',    permiso: 'tarifas:gestionar', grupo: 'Administración' },
+  { a: '/usuarios',      ico: '🔑', texto: 'Personal',           permiso: 'usuarios:gestionar', grupo: 'Administración' },
+  { a: '/base-de-datos', ico: '🗄️', texto: 'Base de datos',      permiso: 'explorador:ver', grupo: 'Administración' },
 ];
 
 export function AppLayout() {
@@ -34,8 +38,11 @@ export function AppLayout() {
           </select>
         ) : hotel && <div className="marca" style={{ fontWeight: 600, fontSize: 13.5 }}>📍 {hotel.nombre}</div>}
         <nav>
-          {MENU.filter((m) => puede(m.permiso)).map((m) => (
-            <NavLink key={m.a} to={m.a} end={m.a === '/'}><span className="ico">{m.ico}</span>{m.texto}</NavLink>
+          {MENU.filter((m) => puede(m.permiso)).map((m, i, lista) => (
+            <div key={m.a} style={{ display: 'contents' }}>
+              {m.grupo && m.grupo !== lista[i - 1]?.grupo && <span className="grupo-menu">{m.grupo}</span>}
+              <NavLink to={m.a} end={m.a === '/'}><span className="ico">{m.ico}</span>{m.texto}</NavLink>
+            </div>
           ))}
         </nav>
         <div className="usuario-lateral">

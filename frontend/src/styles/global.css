@@ -196,3 +196,34 @@ tbody tr:last-child td { border-bottom: 0; }
 
 .cargando { padding: 30px; text-align: center; color: var(--tenue); }
 .separador { height: 1px; background: var(--linea); margin: 4px 0; }
+
+/* ---------- Administración: menú, reportes, tarifas y explorador ---------- */
+.grupo-menu { margin: 12px 10px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #8fb0aa; }
+.filtros-periodo { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.filtros-periodo .campo { min-width: 150px; }
+.grafica-barras { display: flex; align-items: flex-end; gap: 2px; height: 160px; padding: 0 2px; border-bottom: 1px solid var(--linea);
+  background: repeating-linear-gradient(to top, transparent 0 39px, var(--linea) 39px 40px); }
+.grafica-barras .barra { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 3px; }
+.grafica-barras .barra div { width: 100%; background: var(--acento); border-radius: 3px 3px 0 0; transition: opacity .15s; }
+.grafica-barras .barra.futuro div { background: var(--foco); opacity: .45; }
+.grafica-barras .barra.hoy div { background: var(--ambar); }
+.grafica-barras .barra:hover div { opacity: .75; }
+.eje-barras { display: flex; justify-content: space-between; font-size: 12px; color: var(--tenue); margin-top: 6px; }
+.tipos-tarifa { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.tipo-tarifa { border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; display: flex; flex-direction: column; }
+.tipo-tarifa header { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; background: var(--panel-2); border-bottom: 1px solid var(--linea); }
+.tipo-tarifa .precio { font-size: 20px; font-weight: 700; color: var(--acento); }
+.tipo-tarifa .lista li { padding: 9px 14px; }
+.tipo-tarifa footer { margin-top: auto; padding: 10px 14px; border-top: 1px solid var(--linea); justify-content: flex-end; }
+.explorador { display: grid; grid-template-columns: 210px 1fr; gap: 16px; align-items: start; }
+.lista-tablas { display: flex; flex-direction: column; padding: 6px; position: sticky; top: 16px; }
+.lista-tablas button { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; border: 0; background: none; border-radius: var(--radio-sm); cursor: pointer; text-align: left; font-size: 13px; }
+.lista-tablas button:hover { background: var(--panel-2); }
+.lista-tablas button.activa { background: var(--acento-suave); color: var(--acento-fuerte); font-weight: 600; }
+.tabla-datos td { max-width: 260px; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+@media (max-width: 860px) {
+  .explorador { grid-template-columns: 1fr; }
+  .lista-tablas { position: static; flex-direction: row; overflow-x: auto; }
+  .lista-tablas button { flex: none; }
+  .tipos-tarifa { grid-template-columns: 1fr; }
+}

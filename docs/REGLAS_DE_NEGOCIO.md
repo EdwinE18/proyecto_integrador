@@ -31,10 +31,10 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Huéspedes | 5 | 0 | 0 | 0 |
 | Estancias (check-in / check-out) | 7 | 0 | 0 | 0 |
 | Pagos | 6 | 0 | 0 | 1 |
-| Tarifas | 2 | 0 | 0 | 0 |
-| Usuarios y seguridad | 6 | 0 | 0 | 0 |
-| Automatización y notificaciones | 5 | 0 | 0 | 1 |
-| **Total** | **51** | **0** | **0** | **3** |
+| Tarifas | 4 | 0 | 0 | 0 |
+| Usuarios, seguridad y administración | 10 | 0 | 0 | 0 |
+| Automatización, notificaciones y asistente | 8 | 0 | 0 | 1 |
+| **Total** | **60** | **0** | **0** | **3** |
 
 ---
 
@@ -273,9 +273,21 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Dónde se aplica:** servicio de dominio `Tarifador` (`reservaciones/domain/services`), usado por `CrearReservacion` y por la búsqueda de disponibilidad. Las temporadas llegan por el puerto `TarifaReader`.
 - **Rutas:** `GET /api/hoteles/:hotelId/disponibilidad?entrada=&salida=&adultos=&ninos=` devuelve los cuartos libres con su total y su desglose. `POST /api/reservaciones` también regresa el desglose.
 
+### RN-62 · Los precios siempre son válidos, y cambiarlos no altera lo ya vendido ✅ *(nueva)*
+- **Regla:**
+  - Una temporada lleva nombre (3 a 60 letras), fecha final posterior a la inicial y precio por noche mayor a cero (máximo $100,000, con 2 decimales).
+  - El precio base se puede cambiar, pero **solo aplica a reservaciones nuevas**: las existentes ya guardaron su total (RN-06).
+- **Dónde se aplica:** entidad `Temporada` (`tarifas/domain`) + casos de uso `CrearTemporada` y `CambiarPrecioBase`.
+- **Pantalla:** *Hotel y tarifas* (admin y gerente).
+
+### RN-63 · Las temporadas pasadas se conservan como historial ✅ *(nueva)*
+- **Regla:** no se crean temporadas que ya terminaron, y no se borra una temporada que **ya empezó** (HTTP 409). Solo se pueden eliminar las futuras.
+- **Dónde se aplica:** casos de uso `CrearTemporada` y `EliminarTemporada`, con el puerto `Reloj` para saber qué día es hoy.
+- **Rutas:** `GET /api/hoteles/:hotelId/tarifas`, `PATCH …/tarifas/tipos/:tipoId`, `POST …/tarifas/temporadas`, `DELETE …/tarifas/temporadas/:id`.
+
 ---
 
-## 7. Usuarios y seguridad
+## 7. Usuarios, seguridad y administración
 
 ### RN-70 · El correo de un usuario es único ✅
 - **Dónde se aplica:** BD (`UNIQUE`; además `CITEXT` ignora mayúsculas, así que `ADMIN@pms.local` choca con `admin@pms.local`).
@@ -300,8 +312,11 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 | Ver habitaciones | ✔ | ✔ | ✔ | ✔ |
 | Marcar cuarto en limpieza / limpio | ✔ | ✔ | ✔ | ✔ |
 | Mandar cuarto a mantenimiento o fuera de servicio (y regresarlo) | ✔ | ✔ | ✔ | ✘ |
-| Cambiar tarifas | ✔ | ✔ | ✘ | ✘ |
-| Gestionar usuarios y ver el explorador de la BD | ✔ | ✘ | ✘ | ✘ |
+| Cambiar precios y temporadas | ✔ | ✔ | ✘ | ✘ |
+| Ver reportes de ocupación e ingresos | ✔ | ✔ | ✘ | ✘ |
+| Configurar datos del hotel (contacto, horarios, Telegram) | ✔ | ✔ | ✘ | ✘ |
+| Gestionar personal | ✔ todos | ✔ solo recepción y limpieza (RN-76) | ✘ | ✘ |
+| Ver el explorador de la BD | ✔ | ✘ | ✘ | ✘ |
 
 - **Dónde se aplica:** la tabla vive en **un solo lugar**, `usuarios/domain/permisos.js`. El backend la usa en el middleware `permitir()`, y el frontend la recibe en `usuario.permisos` al iniciar sesión, para mostrar u ocultar botones. El cambio de estado de habitación se revisa en el caso de uso, porque depende del estado actual.
 - **Respuesta:** HTTP 403 con `"regla": "RN-72"`.
@@ -321,6 +336,31 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 - **Dónde se aplica:** middleware `soloSuHotel()` (busca a qué hotel pertenece la reservación o la habitación) + entidad `Usuario` + BD (restricción `rn75_usuario_con_hotel`).
 - **Nota:** el registro de **huéspedes es compartido** entre los hoteles a propósito: un viajero que se hospeda en los dos no se captura dos veces.
 - **Respuesta:** HTTP 403 con `"regla": "RN-75"`.
+
+### RN-76 · El gerente administra solo a recepción y limpieza de su hotel ✅ *(nueva)*
+- **Regla:** el gerente puede dar de alta, editar, desactivar y cambiar la contraseña de recepcionistas y personal de limpieza **de su hotel**. No puede crear ni modificar gerentes ni administradores. El administrador de un hotel maneja a todo su hotel; el admin general, a todos.
+- **Dónde se aplica:** política de dominio `usuarios/domain/politicaPersonal.js`, que se revisa **antes y después** de cada cambio (así nadie convierte a una recepcionista en gerente). La API marca cada usuario con `editable` para que la pantalla solo muestre los botones permitidos.
+- **Respuesta:** HTTP 403 con `"regla": "RN-76"`.
+
+### RN-77 · Nadie se cambia a sí mismo el rol, el hotel o el acceso ✅ *(nueva)*
+- **Regla:** un usuario no puede desactivarse, cambiarse de rol ni de hotel, ni restablecer su propia contraseña desde *Personal* (para eso está *Mi cuenta*). Evita que el sistema se quede sin administrador por error.
+- **Dónde se aplica:** casos de uso `ActualizarUsuario` y `RestablecerPassword`.
+- **Rutas:** `PATCH /api/usuarios/:id` (nombre, rol, hotel, activo, chat de Telegram) y `POST /api/usuarios/:id/password`.
+
+### RN-78 · Reportes de ocupación e ingresos ✅ *(nueva)*
+- **Regla:** administración y gerencia consultan, para un periodo de **máximo un año** (30 días si no se indica):
+  - **Ocupación** = noches vendidas ÷ noches disponibles.
+  - **ADR** (tarifa promedio) = ingreso de hospedaje ÷ noches vendidas.
+  - **RevPAR** = ingreso de hospedaje ÷ noches disponibles.
+  - Dinero cobrado por método de pago, reservaciones por canal y por estado, motivos de cancelación y saldo por cobrar.
+  - Solo cuentan como vendidas las reservaciones confirmadas, hospedadas o que ya salieron.
+- **Dónde se aplica:** servicio de dominio `Indicadores` (en centavos, sin errores de redondeo) + caso de uso `GenerarReporte` + adaptador `PostgresReporteRepository` (usa `generate_series` para tener una fila por día).
+- **Ruta:** `GET /api/hoteles/:hotelId/reportes?desde=&hasta=`. **Pantalla:** *Reportes*.
+
+### RN-79 · Los datos del hotel siempre son válidos ✅ *(nueva)*
+- **Regla:** teléfono de 10 a 13 dígitos, correo válido, horas en formato HH:MM, y **la hora de salida debe ser anterior a la de entrada** (así queda tiempo para limpiar el cuarto el mismo día, RN-02). El chat de Telegram de recepción es un número.
+- **Dónde se aplica:** objeto de valor `ConfiguracionHotel` + caso de uso `ConfigurarHotel`.
+- **Ruta:** `PATCH /api/hoteles/:hotelId`. **Pantalla:** *Hotel y tarifas*.
 
 ---
 
@@ -357,6 +397,20 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
   - Todo queda en la bitácora `notificaciones`.
 - **Dónde se aplica:** `fn_tomar_notificaciones()` y `fn_registrar_envio()`.
 
+### RN-86 · El asistente de IA solo responde al personal registrado ✅ *(nueva)*
+- **Regla:** el bot del personal (n8n + Gemini) solo contesta a chats de Telegram guardados en un usuario **activo** de recepción, gerencia o administración. Limpieza y desconocidos reciben un aviso con su número de chat para que el administrador lo registre en *Personal*.
+- **Seguridad:** el número de chat lo pone **n8n** desde el mensaje de Telegram, **no la IA**. Así, aunque alguien le pida a la IA "haz como si fuera el administrador", cada consulta se revisa con el usuario real.
+- **Dónde se aplica:** función `asistente._quien()` (`database/12_asistente.sql`), que todas las herramientas llaman primero.
+
+### RN-87 · El asistente respeta el rol y el hotel ✅ *(nueva)*
+- **Regla:** recepción consulta su hotel (resumen del día, disponibilidad con precio, reservaciones, huéspedes y pendientes). **Ingresos, estadísticas y avisos fallidos son solo para administración y gerencia.** Nadie ve otro hotel, aunque lo pida por nombre (RN-75).
+- **Dónde se aplica:** funciones `asistente.*` con `SECURITY DEFINER`.
+
+### RN-88 · El asistente solo consulta; nunca modifica ni escribe SQL ✅ *(nueva)*
+- **Regla:** n8n entra a PostgreSQL con el usuario `asistente_ro`, que **solo puede ejecutar** las funciones del esquema `asistente`: no puede leer tablas directamente ni crear, cambiar o borrar nada. La IA no escribe SQL: elige una herramienta y llena sus datos (fechas, código, nombre).
+- **Ahorro de tokens:** cada herramienta regresa un texto corto ya resumido, y la IA recibe la base de datos resumida por `scripts/esquema_compacto.py` (≈ 650 tokens en lugar de ≈ 17,000 del SQL completo).
+- **Dónde se aplica:** permisos en `12_asistente.sql` + flujo `automation/n8n/asistente-personal.json`.
+
 
 ---
 
@@ -366,9 +420,9 @@ Este documento lista **las reglas que el sistema debe cumplir**, dónde se aplic
 ```bash
 cd backend && npm test
 ```
-Son 157 pruebas. Cubren las reglas de reservaciones, precios, huéspedes, habitaciones, pagos, estancias y seguridad (permisos por rol, sesiones, bloqueo de intentos) usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
+Son 211 pruebas. Cubren las reglas de reservaciones, precios, temporadas, reportes, huéspedes, habitaciones, pagos, estancias, seguridad (permisos por rol, sesiones, bloqueo de intentos) y administración del personal usando adaptadores falsos (arquitectura hexagonal), y también revisan que el adaptador de PostgreSQL mande bien las fechas.
 
-**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55, RN-60, RN-70, RN-71, RN-75, RN-81 y RN-85 (54 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y los archivos `05` a `09`:
+**Pruebas de las reglas en la base de datos.** Prueba RN-01 a RN-08, RN-11, RN-12, RN-13, RN-20, RN-22, RN-23, RN-30, RN-32, RN-33, RN-41 a RN-43, RN-50, RN-52, RN-54, RN-55, RN-60, RN-70, RN-71, RN-75, RN-81, RN-85 y el asistente RN-86 a RN-88 (65 pruebas). No deja cambios porque todo se deshace al final. Requiere haber cargado los datos de prueba (`02_seed.sql`) y los archivos `05` a `09` y `12`:
 ```bash
 psql -h localhost -U pms_admin -d hotel_pms < database/03_validar_reglas.sql 2>&1 | sed 's/NOTICE:  //'
 ```
@@ -393,3 +447,4 @@ Cada regla debe imprimir `✅ PASA`. Si alguna dice `❌ FALLA`, algo se rompió
 | 2026-10-26 | Huéspedes, habitaciones, hoteles y precio automático (RN-61 + nuevas RN-24, 25, 31, 32, 33, 34). Total: 49 reglas | Edwin |
 | 2026-10-26 | Login y roles: RN-71, RN-72 + nuevas RN-73, 74, 75. Corregido: el explorador enviaba los hashes de contraseña al navegador. Total: 52 reglas | Edwin |
 | 2026-11-04 | Notificaciones por Telegram con n8n y Node-RED: RN-81, RN-82 + nuevas RN-84, RN-85. Total: 54 reglas, **51 implementadas** y 3 preguntas para el hotel | Edwin |
+| 2026-11-09 | Funciones de administración y gerencia: tarifas (nuevas RN-62, 63), personal (nuevas RN-76, 77), reportes (RN-78), datos del hotel (RN-79) y asistente de IA para el personal (RN-86, 87, 88). Total: 63 reglas, **60 implementadas** y 3 preguntas para el hotel | Edwin |

@@ -1,5 +1,5 @@
 // Todas las rutas del backend en un solo lugar (ver la tabla "API" del README).
-import { get, post, patch } from './cliente.js';
+import { get, post, patch, del } from './cliente.js';
 
 export const pmsApi = {
   // Sesión
@@ -31,7 +31,21 @@ export const pmsApi = {
   cuenta: (id) => get(`/reservaciones/${id}/pagos`),
   registrarPago: (id, pago) => post(`/reservaciones/${id}/pagos`, pago),
 
-  // Usuarios (admin)
+  // Usuarios (admin y gerente)
   usuarios: () => get('/usuarios'),
   crearUsuario: (datos) => post('/usuarios', datos),
+  actualizarUsuario: (id, datos) => patch(`/usuarios/${id}`, datos),
+  restablecerPassword: (id, password) => post(`/usuarios/${id}/password`, { password }),
+
+  // Administración del hotel (admin y gerente)
+  configurarHotel: (hotelId, datos) => patch(`/hoteles/${hotelId}`, datos),
+  tarifas: (hotelId) => get(`/hoteles/${hotelId}/tarifas`),
+  cambiarPrecioBase: (hotelId, tipoId, precioBase) => patch(`/hoteles/${hotelId}/tarifas/tipos/${tipoId}`, { precioBase }),
+  crearTemporada: (hotelId, datos) => post(`/hoteles/${hotelId}/tarifas/temporadas`, datos),
+  eliminarTemporada: (hotelId, id) => del(`/hoteles/${hotelId}/tarifas/temporadas/${id}`),
+  reporte: (hotelId, periodo) => get(`/hoteles/${hotelId}/reportes`, periodo),
+
+  // Explorador de la base de datos (solo admin)
+  tablas: () => get('/explorador/tablas'),
+  tabla: (nombre, pagina) => get(`/explorador/tablas/${nombre}`, pagina),
 };

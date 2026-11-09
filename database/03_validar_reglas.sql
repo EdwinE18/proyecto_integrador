@@ -216,6 +216,37 @@ BEGIN
              AND n.mensaje LIKE '%' || (SELECT codigo FROM reservaciones WHERE fecha_entrada = '2030-01-13') || '%')$q$);
 
   RAISE NOTICE '';
+  RAISE NOTICE '==== ASISTENTE DEL PERSONAL (requiere 12_asistente.sql) ====';
+  UPDATE usuarios SET telegram_chat_id = '9000001' WHERE email = 'recepcion@losarcos.mx';
+  UPDATE usuarios SET telegram_chat_id = '9000002' WHERE email = 'admin@pms.local';
+  UPDATE usuarios SET telegram_chat_id = '9000003' WHERE email = 'limpieza@losarcos.mx';
+  PERFORM pg_temp.debe_cumplir('RN-86', 'Un chat desconocido no obtiene información',
+    $q$asistente.resumen_dia('123') LIKE '⛔%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-86', 'Limpieza no usa el asistente',
+    $q$asistente.pendientes('9000003') LIKE '⛔%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-86', 'Recepción sí consulta el resumen de su hotel',
+    $q$asistente.resumen_dia('9000001') LIKE '%Posada Los Arcos%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-75', 'Recepción no ve el otro hotel aunque lo pida',
+    $q$asistente.resumen_dia('9000001', 'Cañón') = 'No encontré ese hotel.'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-87', 'Recepción no ve ingresos',
+    $q$asistente.ingresos('9000001', CURRENT_DATE - 30, CURRENT_DATE) LIKE '⛔%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-87', 'El administrador sí ve ingresos',
+    $q$asistente.ingresos('9000002', CURRENT_DATE - 30, CURRENT_DATE) LIKE '💰%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-61', 'La disponibilidad del asistente cobra la temporada',
+    $q$asistente.disponibilidad('9000002', '2030-12-23', '2030-12-24', 1, 0, 'Arcos') LIKE '%Hab.%'$q$);
+  PERFORM pg_temp.debe_cumplir('RN-14', 'El asistente no cotiza fechas pasadas',
+    $q$asistente.disponibilidad('9000002', CURRENT_DATE - 5, CURRENT_DATE - 3) LIKE '%pasadas%'$q$);
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'asistente_ro') THEN
+    PERFORM pg_temp.debe_cumplir('RN-88', 'El usuario de n8n no puede leer tablas directamente',
+      $q$NOT has_table_privilege('asistente_ro', 'usuarios', 'SELECT') AND NOT has_table_privilege('asistente_ro', 'pagos', 'SELECT')$q$);
+    PERFORM pg_temp.debe_cumplir('RN-88', 'El usuario de n8n no puede modificar reservaciones',
+      $q$NOT has_table_privilege('asistente_ro', 'reservaciones', 'UPDATE,INSERT,DELETE')$q$);
+    PERFORM pg_temp.debe_cumplir('RN-88', 'El usuario de n8n solo ejecuta las herramientas del asistente',
+      $q$has_function_privilege('asistente_ro', 'asistente.resumen_dia(text, text)', 'EXECUTE')
+         AND NOT has_function_privilege('asistente_ro', 'asistente._quien(text, boolean)', 'EXECUTE')$q$);
+  END IF;
+
+  RAISE NOTICE '';
   RAISE NOTICE 'Listo. Todos los cambios de prueba se deshacen (ROLLBACK).';
 END $$;
 

@@ -10,6 +10,9 @@ import Habitaciones from './pages/Habitaciones.jsx';
 import Huespedes from './pages/Huespedes.jsx';
 import Usuarios from './pages/Usuarios.jsx';
 import MiCuenta from './pages/MiCuenta.jsx';
+import Reportes from './pages/Reportes.jsx';
+import Configuracion from './pages/Configuracion.jsx';
+import Explorador from './pages/Explorador.jsx';
 
 /** Solo muestra la página si el rol tiene el permiso. El backend vuelve a revisarlo (RN-72). */
 function Con({ permiso, children }) {
@@ -31,6 +34,9 @@ function Rutas() {
         <Route path="habitaciones" element={<Habitaciones />} />
         <Route path="huespedes" element={<Con permiso="huespedes:gestionar"><Huespedes /></Con>} />
         <Route path="usuarios" element={<Con permiso="usuarios:gestionar"><Usuarios /></Con>} />
+        <Route path="reportes" element={<Con permiso="reportes:ver"><Reportes /></Con>} />
+        <Route path="configuracion" element={<Con permiso="tarifas:gestionar"><Configuracion /></Con>} />
+        <Route path="base-de-datos" element={<Con permiso="explorador:ver"><Explorador /></Con>} />
         <Route path="cuenta" element={<MiCuenta />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
