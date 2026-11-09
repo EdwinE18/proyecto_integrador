@@ -2,8 +2,8 @@
 
 Sistema de administración hotelera: reservaciones, registro de huéspedes, asignación de cuartos y control de ocupación, para posadas y hoteles boutique de Tuxtla y San Cristóbal.
 
-**Stack:** React (Vite) · Node.js (Express) · PostgreSQL · n8n · Node-RED · Telegram Bot · AWS (EC2 + RDS)
-**Arquitectura:** Hexagonal (Puertos y Adaptadores)
+**Stack:** React (Vite) · Node.js (Express) · PostgreSQL · n8n · Node-RED · Telegram Bot · Ejecución local (Ubuntu / WSL)
+**Arquitectura:** Hexagonal (Puertos y Adaptadores) en el backend · Basada en componentes en el frontend
 
 ---
 
@@ -22,10 +22,12 @@ cd ../backend && cp .env.example .env && npm install
 npm test          # pruebas del dominio (no necesitan BD)
 npm run dev       # API en http://localhost:3000/api/health
 
-# Frontend
-cd .. && npm create vite@latest frontend -- --template react   # elige "Ignore files and continue"
-cd frontend && npm install && npm run dev
+# Frontend (en OTRA terminal, con el backend corriendo)
+cd frontend && npm install
+npm run dev       # abre http://localhost:5173  (usuarios de prueba abajo, contraseña Demo1234)
 ```
+
+El frontend reenvía todo lo que empieza con `/api` al backend en el puerto 3000 (configurado en `frontend/vite.config.js`), así que no hay problemas de CORS.
 
 > `crear_estructura.sh` genera solo las carpetas desde cero, por si quieres rehacer la estructura en otra ruta.
 
@@ -48,7 +50,7 @@ cd frontend && npm install && npm run dev
                           └─────────────────────────┘
 ```
 
-**Regla de oro:** las dependencias apuntan hacia adentro. El dominio no importa Express, `pg` ni Telegram. Solo `shared/container.js` conecta adaptadores con puertos, así que puedes cambiar PostgreSQL local por RDS (o por un repositorio falso en pruebas) sin tocar las reglas de negocio.
+**Regla de oro:** las dependencias apuntan hacia adentro. El dominio no importa Express, `pg` ni Telegram. Solo `shared/container.js` conecta adaptadores con puertos, así que puedes cambiar PostgreSQL local por una base en la nube (o por un repositorio falso en pruebas) sin tocar las reglas de negocio.
 
 ### Estructura
 
@@ -59,16 +61,21 @@ hotel-pms/
 │   │   ├── modules/                       # un módulo por contexto del negocio
 │   │   │   ├── reservaciones/             # ← módulo de ejemplo ya implementado
 │   │   │   │   ├── domain/
-│   │   │   │   │   ├── entities/          # Reservacion.js
+│   │   │   │   │   ├── entities/          # Reservacion.js (ciclo de vida completo)
 │   │   │   │   │   ├── value-objects/     # RangoFechas.js
 │   │   │   │   │   ├── errors/            # ReservacionError.js
-│   │   │   │   │   └── ports/             # ReservacionRepository.js, EventPublisher.js
-│   │   │   │   ├── application/use-cases/ # CrearReservacion.js, ListarReservaciones.js
+│   │   │   │   │   └── ports/             # ReservacionRepository, HabitacionReader, Reloj, EventPublisher
+│   │   │   │   ├── application/use-cases/ # Crear, Listar, Obtener, Confirmar, Cancelar
 │   │   │   │   └── infrastructure/
 │   │   │   │       ├── http/              # reservacion.routes.js   (adaptador entrada)
 │   │   │   │       └── persistence/       # PostgresReservacionRepository.js (salida)
-│   │   │   ├── hoteles/  habitaciones/  huespedes/
-│   │   │   └── estancias/  pagos/  usuarios/   # misma estructura, por implementar
+│   │   │   ├── pagos/                     # ✅ Dinero (centavos), Pago, CuentaReservacion
+│   │   │   ├── estancias/                 # ✅ Estancia, check-in y check-out (transacciones)
+│   │   │   ├── huespedes/                 # ✅ Huesped (normaliza y valida), búsqueda
+│   │   │   ├── habitaciones/              # ✅ Habitacion (estados RN-24), disponibilidad con precio
+│   │   │   ├── hoteles/                   # ✅ Lista de hoteles con ocupación del día
+│   │   │   ├── explorador/                # ✅ Página para ver la BD
+│   │   │   └── usuarios/                  # ✅ Login (JWT + bcrypt), permisos por rol, bloqueo de intentos
 │   │   ├── shared/
 │   │   │   ├── container.js               # inyección de dependencias
 │   │   │   └── infrastructure/            # pool BD, config, outbox, middlewares
@@ -76,21 +83,99 @@ hotel-pms/
 │   │   └── server.js
 │   ├── tests/unit  tests/integration
 │   └── package.json  .env.example
-├── frontend/src/
-│   ├── domain/models                      # tipos: Reservacion, Habitacion...
-│   ├── application/{hooks,services}       # useReservaciones(), lógica de pantalla
-│   ├── infrastructure/{api,storage}       # cliente HTTP (fetch/axios), token
-│   └── ui/{components,pages,layouts,routes,styles}
-├── automation/
-│   ├── n8n/workflows                      # exporta aquí los .json de n8n
-│   ├── node-red/flows                     # flows.json de Node-RED
-│   └── telegram-bot/src
+├── frontend/src/                          # React + Vite · ARQUITECTURA DE COMPONENTES
+│   ├── components/                        # Reutilizables: base (Boton, Campo, Modal, Aviso, Chip)
+│   │                                      # y compuestos (FormHuesped, ModalCheckIn, ModalPago, ModalCancelar)
+│   ├── layouts/AppLayout.jsx              # Marco de la app: menú lateral según el rol
+│   ├── pages/                             # Pantallas: Login, Tablero, NuevaReservacion, Reservaciones,
+│   │                                      # DetalleReservacion, Habitaciones, Huespedes, Usuarios, MiCuenta
+│   ├── hooks/                             # Lógica reutilizable: useConsulta (cargar datos), useAccion (guardar)
+│   ├── context/SesionContext.jsx          # Usuario, permisos y hotel elegido, para toda la app
+│   ├── services/                          # Comunicación con el backend: pmsApi, cliente HTTP, sesión
+│   ├── utils/                             # estados.js (textos y colores), formato.js (dinero y fechas)
+│   ├── styles/global.css
+│   └── App.jsx                            # Rutas: cada página pide su permiso
+├── automation/                            # ✅ Telegram (guía paso a paso en automation/README.md)
+│   ├── n8n/notificaciones-telegram.json   # Envía los avisos pendientes cada minuto
+│   └── node-red/flows.json                # Bot que conversa + resumen diario a las 8:00
 ├── database/  01_schema.sql  02_seed.sql  setup_db.sh  migrations/
-├── infra/{aws,nginx}
 └── docs/{diagramas,investigacion}
 ```
 
 Para crear un módulo nuevo copia el patrón de `reservaciones`: entidad → puerto → caso de uso → adaptador Postgres → rutas → registrarlo en `container.js`.
+
+---
+
+## Inicio de sesión
+
+Toda la API pide sesión (excepto el login). Usuarios de prueba (contraseña `Demo1234`):
+
+| Correo | Rol | Hotel |
+|---|---|---|
+| `admin@pms.local` | admin general | todos |
+| `recepcion@losarcos.mx` | recepción | Posada Los Arcos |
+| `limpieza@losarcos.mx` | limpieza | Posada Los Arcos |
+| `gerente@boutiquecanon.mx` | gerente | Hotel Boutique Cañón |
+
+```bash
+# 1. Iniciar sesión y guardar el token
+TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"recepcion@losarcos.mx","password":"Demo1234"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+
+# 2. Mandarlo en cada petición
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/hoteles
+```
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `POST` | `/api/auth/login` | `{ "email", "password" }` → `{ token, expiraEn, usuario: { rol, permisos, ... } }` |
+| `GET` | `/api/auth/yo` | Usuario de la sesión actual |
+| `POST` | `/api/auth/password` | Cambiar mi contraseña: `{ "actual", "nueva" }` |
+| `GET` / `POST` | `/api/usuarios` | Listar / crear usuarios (solo admin) |
+
+Respuestas de seguridad: **401** sin sesión o sesión vencida (RN-71) · **403** sin permiso para esa acción (RN-72) o de otro hotel (RN-75) · **429** demasiados intentos (RN-74).
+
+> ⚠️ Antes de usarlo en un hotel real cambia `JWT_SECRET` en `backend/.env` por uno propio: `openssl rand -hex 32`
+
+---
+
+## API
+
+Todas las respuestas son JSON. Cuando se rompe una regla de negocio, la respuesta incluye el campo `"regla"` (por ejemplo `"RN-11"`), que se busca en `docs/REGLAS_DE_NEGOCIO.md`.
+
+| Método | Ruta | Qué hace | Reglas |
+|---|---|---|---|
+| `POST` | `/api/reservaciones` | Crea una reservación (queda `pendiente`). **El precio lo calcula el sistema** | RN-01, 04, 05, 08, 11, 13, 14, 61 |
+| `GET` | `/api/reservaciones?hotelId=&desde=&hasta=` | Lista las reservaciones de un hotel en un rango de fechas | — |
+| `GET` | `/api/reservaciones/:id` | Consulta una reservación | — |
+| `PATCH` | `/api/reservaciones/:id/confirmar` | `pendiente → confirmada` | RN-09 |
+| `PATCH` | `/api/reservaciones/:id/cancelar` | Cancela. Cuerpo: `{ "motivo": "..." }` | RN-10, RN-12 |
+| `GET` | `/api/reservaciones/:id/pagos` | Estado de cuenta: total, pagado, saldo y pagos | RN-51 |
+| `POST` | `/api/reservaciones/:id/pagos` | Registra un pago. Cuerpo: `{ "monto", "metodo", "referencia"?, "esAnticipo"? }` | RN-50, 54, 55, 56 |
+| `POST` | `/api/reservaciones/:id/check-in` | Llegada del huésped. Cuerpo opcional: `{ "placas", "observaciones" }` | RN-42, 44, 45, 46 |
+| `POST` | `/api/reservaciones/:id/check-out` | Salida del huésped (el cuarto pasa a limpieza) | RN-43, 52 |
+| `GET` | `/api/hoteles` | Hoteles con su ocupación de hoy | — |
+| `GET` | `/api/hoteles/:hotelId/habitaciones` | Habitaciones del hotel con estado, tipo y precio base | — |
+| `GET` | `/api/hoteles/:hotelId/disponibilidad?entrada=&salida=&adultos=&ninos=` | Cuartos libres con total y desglose por noche | RN-01, 11, 13, 14, 61 |
+| `GET` | `/api/hoteles/:hotelId/agenda?desde=&hasta=&estados=` | Reservaciones con huésped, cuarto y saldo (para el tablero) | — |
+| `GET` | `/api/reservaciones/:id/detalle` | Reservación con huésped, cuarto, saldo y estancia | — |
+| `PATCH` | `/api/habitaciones/:id/estado` | Cambia el estado. Cuerpo: `{ "estado", "comentario"? }` | RN-24, 25 |
+| `GET` | `/api/huespedes?q=texto` | Busca por nombre, correo, teléfono o documento | — |
+| `POST` | `/api/huespedes` | Registra un huésped | RN-30 a RN-33 |
+| `GET` | `/api/huespedes/:id` | Consulta un huésped (documento oculto) | RN-34 |
+| `PATCH` | `/api/huespedes/:id` | Edita los datos de un huésped | RN-31 a RN-33 |
+| `GET` | `/api/explorador/tablas` | Lista las tablas de la BD (página en `http://localhost:3000`) | — |
+
+Ejemplo:
+```bash
+curl -X POST http://localhost:3000/api/reservaciones -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{
+  "hotelId": "11111111-1111-1111-1111-111111111111",
+  "huespedId": "b0000000-0000-0000-0000-000000000001",
+  "habitacionId": "<id de una habitación>",
+  "entrada": "2026-12-20", "salida": "2026-12-22",
+  "numAdultos": 2, "numNinos": 0
+}'
+```
 
 ---
 
@@ -133,13 +218,56 @@ eventos_dominio 1─N notificaciones
 
 ---
 
-## 4. Automatización (flujo sugerido)
+### Consultas para la evaluación de Base de Datos
 
-1. El backend crea una reservación → inserta `reservacion.creada` en `eventos_dominio`.
-2. **n8n** (nodo Postgres cada minuto, o webhook) lee eventos con `procesado = false`, envía la confirmación al huésped por **Telegram** y marca el evento como procesado.
-3. **Node-RED** genera el reporte diario de ocupación (`v_ocupacion_hoy`) y avisa a recepción las llegadas del día.
+`database/11_consultas_evaluacion.sql` reúne, sobre las tablas reales del hotel, un ejemplo de cada tema evaluado (cada consulta tiene un número para ubicarla rápido):
 
-## 5. Despliegue en AWS
+| Tema | Consultas | Qué muestra |
+|---|---|---|
+| 1. Selección | 1.1 – 1.5 | `WHERE` con comparación, `IN`, `BETWEEN`, `ILIKE`, `IS NULL` |
+| 2. Proyección | 2.1 – 2.4 | Columnas específicas, alias, columnas calculadas, `DISTINCT` |
+| 3. UNION | 3.1 – 3.4 | Llegadas + salidas de hoy, directorio de contactos, `UNION` vs `UNION ALL`, estado de cuenta |
+| 4. Funciones | 4.1 – 4.6 | Agregación con `GROUP BY` y `HAVING`, fechas, `COALESCE`/`NULLIF`/`CAST`, funciones PL/pgSQL propias |
+| 5. Subconsultas | 5.1 – 5.6 | `IN`, `NOT EXISTS` (regla anti-sobreventa), escalar, contra el promedio, en el `FROM`, correlacionada |
+| 6. Funciones numéricas | 6.1 – 6.6 | `ROUND`, `TRUNC`, `CEIL`, `FLOOR`, `ABS`, `MOD`, `POWER`, `SQRT`, `GREATEST`; IVA y anticipos |
+| 7. Manipulación de caracteres | 7.1 – 7.6 | `CONCAT`, `UPPER`, `INITCAP`, `SUBSTRING`, `SPLIT_PART`, `REPLACE`, `TRANSLATE`, `STRING_AGG`… (y `04_funciones_cadena.sql`) |
+| 8. Reglas de precedencia | 8.1 – 8.6 | `*` antes que `+`, división entera, **`AND` antes que `OR` con resultados distintos**, `NOT`, el `CHECK` de RN-12 |
 
-- **RDS PostgreSQL:** ejecuta `01_schema.sql` con el usuario maestro (las extensiones `btree_gist`, `pgcrypto` y `citext` están permitidas en RDS).
-- **EC2 (Ubuntu):** backend con `pm2`, frontend compilado (`npm run build`) servido por Nginx (`infra/nginx`), n8n y Node-RED en Docker.
+```bash
+psql -h localhost -U pms_admin -d hotel_pms -f database/10_datos_demo.sql          # datos de demostración (una vez)
+psql -h localhost -U pms_admin -d hotel_pms -f database/11_consultas_evaluacion.sql
+```
+
+## 4. Automatización (Telegram)
+
+1. El backend guarda cada evento importante en `eventos_dominio`: reservación confirmada o cancelada, pago, check-in, check-out, cuarto a mantenimiento.
+2. **PostgreSQL** arma el texto y decide a quién va (`database/09_notificaciones.sql`, con `CONCAT`, `STRING_AGG`, `TO_CHAR`).
+3. **n8n** revisa cada minuto y lo envía por Telegram. Si falla, lo reintenta hasta 5 veces, sin duplicar mensajes.
+4. **Node-RED** es el bot que conversa: el huésped manda su código de reservación y queda vinculado. A las 8:00 envía el resumen del día al grupo de recepción.
+
+La configuración paso a paso está en **[automation/README.md](automation/README.md)**.
+
+## 5. Ejecución local y demostración
+
+El sistema se entrega para correr en una computadora con Ubuntu (o Windows con WSL). Se abren **dos terminales**:
+
+```bash
+# Terminal 1 — base de datos y backend (API en http://localhost:3000)
+sudo service postgresql start
+cd ~/proyectoI/hotel-pms/backend && npm run dev
+
+# Terminal 2 — frontend (abre http://localhost:5173)
+cd ~/proyectoI/hotel-pms/frontend && npm run dev
+```
+
+### Mostrarlo desde otro dispositivo (opcional)
+
+Con **Cloudflare Tunnel** se obtiene un enlace público temporal sin pagar ni configurar un servidor. Sirve para abrir el sistema desde un celular durante la presentación y para que Telegram pueda comunicarse con el sistema local.
+
+```bash
+# Terminal 3 (con los otros dos corriendo)
+cloudflared tunnel --url http://localhost:5173
+# → muestra un enlace como https://palabras-al-azar.trycloudflare.com
+```
+
+El enlace cambia cada vez que se ejecuta el comando y deja de funcionar al cerrarlo.

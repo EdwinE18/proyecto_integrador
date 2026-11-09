@@ -6,14 +6,15 @@
 set -e
 DB_NAME="hotel_pms"
 DB_USER="pms_admin"
-DB_PASS="${DB_PASS:-CambiaEstaClave123}"
+DB_PASS="${DB_PASS:-PI123}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if ! command -v psql >/dev/null; then
   echo "▶ Instalando PostgreSQL..."
   sudo apt update && sudo apt install -y postgresql postgresql-contrib
 fi
-sudo systemctl enable --now postgresql
+# En WSL no siempre hay systemctl: si falla, se usa service
+sudo systemctl enable --now postgresql 2>/dev/null || sudo service postgresql start
 
 echo "▶ Creando usuario y base de datos..."
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
@@ -32,8 +33,19 @@ sudo -u postgres psql -d "$DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;
 echo "▶ Creando tablas..."
 PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -f "$DIR/01_schema.sql"
 
+echo "▶ Aplicando funciones de cadena y reglas de negocio..."
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/04_funciones_cadena.sql" >/dev/null
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/05_reglas_reservacion.sql"
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/06_reglas_estancias_pagos.sql"
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/07_reglas_huespedes.sql"
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/08_reglas_usuarios.sql"
+PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -q -f "$DIR/09_notificaciones.sql"
+
 read -rp "¿Cargar datos de prueba? (s/n) " R
-[[ "$R" == "s" ]] && PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/02_seed.sql"
+if [[ "$R" == "s" ]]; then
+  PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/02_seed.sql"
+  PGPASSWORD="$DB_PASS" psql -h localhost -U "$DB_USER" -d "$DB_NAME" -f "$DIR/10_datos_demo.sql"
+fi
 
 echo "✅ Listo. Conéctate con:  psql -h localhost -U $DB_USER -d $DB_NAME"
 echo "   DATABASE_URL=postgres://$DB_USER:$DB_PASS@localhost:5432/$DB_NAME"
