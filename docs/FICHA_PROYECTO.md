@@ -2,7 +2,7 @@
 
 **Área de aplicación:** Turismo
 
-> Texto listo para copiar en la tabla de la ficha. Los campos 1 y 2 son los originales; el 3 se ajustó porque el sistema se entrega para correr en local; los campos 4 a 7 son nuevos.
+> Texto listo para copiar en la tabla de la ficha. Los campos 1 a 3 son los originales (el 3 con el detalle de lo que se usó); los campos 4 a 7 son nuevos.
 
 ---
 
@@ -13,7 +13,7 @@ Sistema de administración hotelera (PMS) para reservaciones, registro de huésp
 Los hoteles boutique y posadas familiares en Tuxtla y San Cristóbal operan con agendas manuales, causando sobreventas de habitaciones.
 
 ### 3. Tecnología de implementación
-Frontend en **React (Vite)** con arquitectura basada en componentes; backend en **Node.js (Express)** con arquitectura hexagonal; base de datos **PostgreSQL**; automatización con **n8n local**, **Node-RED** y **Telegram Bot**. Ejecución local en **Ubuntu (WSL)**, con **Cloudflare Tunnel** opcional para acceso desde otros dispositivos.
+Frontend en **React (Vite)** con arquitectura basada en componentes; backend en **Node.js (Express)** con arquitectura hexagonal; base de datos **PostgreSQL**; automatización con **n8n**, **Node-RED** y **Telegram Bot**. Despliegue en **AWS (EC2 con nginx y RDS PostgreSQL)**; desarrollo en **Ubuntu (WSL)**.
 
 ### 4. Problema específico
 En los hoteles boutique y posadas familiares de Tuxtla Gutiérrez y San Cristóbal de las Casas, las reservaciones se anotan en agendas de papel o en mensajes de WhatsApp, sin una fuente única que muestre qué habitaciones están ocupadas en cada fecha. Cuando dos personas del personal reciben solicitudes al mismo tiempo, o un huésped cambia sus fechas, la misma habitación se vende dos veces (**sobreventa**). Esto obliga a reubicar o rechazar huéspedes a su llegada y daña la reputación del establecimiento. El registro manual también provoca otros problemas: no se sabe con certeza cuánto debe cada huésped, se pierde el historial de anticipos, el personal de limpieza no se entera a tiempo de qué cuartos se liberaron y los precios de temporada alta se calculan a mano, con errores.
@@ -63,7 +63,7 @@ Los hallazgos se convierten en reglas de negocio. La solución se valida con:
 
 ## Notas para la entrega (no copiar en la ficha)
 
-- **Campo 3:** si el profe todavía pide AWS, regresar la frase original (*"Despliegue en AWS (EC2, RDS PostgreSQL)"*).
+- **Campo 3:** el despliegue en AWS está en `deploy/aws/README.md` (AWS Academy Learner Lab).
 - **Campo 7:** las entrevistas y la observación **hay que hacerlas** antes de presentar resultados. Preguntas clave pendientes (ver `REGLAS_DE_NEGOCIO.md`):
   1. ¿Cuántas horas puede estar una reservación sin confirmar antes de cancelarse sola? (RN-15)
   2. ¿Qué porcentaje de anticipo se pide y cuál es la política de reembolso? (RN-53)

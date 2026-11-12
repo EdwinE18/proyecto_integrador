@@ -102,6 +102,7 @@ hotel-pms/
 │   ├── n8n/notificaciones-telegram.json   # Envía los avisos pendientes cada minuto
 │   ├── n8n/asistente-personal.json        # Asistente con IA para recepción, gerencia y admin
 │   └── node-red/flows.json                # Bot que conversa + resumen diario a las 8:00
+├── deploy/aws/                           # Despliegue en AWS: instalar.sh (EC2 + RDS), nginx, guía paso a paso
 ├── scripts/esquema_compacto.py            # Resume la BD para la IA (≈ 650 tokens en vez de ≈ 17,000)
 ├── database/  01_schema.sql … 14_bot_huespedes.sql  setup_db.sh
 └── docs/{diagramas,investigacion}
@@ -273,6 +274,17 @@ psql -h localhost -U pms_admin -d hotel_pms -f database/11_consultas_evaluacion.
 5. **Asistente del personal (n8n + IA Gemini):** otro bot, solo para recepción, gerencia y administración. Se le pregunta en lenguaje natural (*"¿qué tengo libre del 20 al 23 para 2?"*, *"¿cuánto cobramos esta semana?"*) y contesta usando funciones seguras de la BD (`database/12_asistente.sql`): la IA no escribe SQL, solo consulta y respeta el rol y el hotel de quien pregunta (RN-86 a RN-88).
 
 La configuración paso a paso está en **[automation/README.md](automation/README.md)**.
+
+## 6. Despliegue en AWS
+
+Guía paso a paso para AWS Academy Learner Lab en [`deploy/aws/README.md`](deploy/aws/README.md). En resumen: se crean un EC2 (Ubuntu 24.04) y una base RDS PostgreSQL 16 desde la consola, y en el EC2 se corre una sola vez:
+
+```bash
+sudo git clone https://github.com/EdwinE18/proyecto_integrador.git /opt/hotel-pms
+cd /opt/hotel-pms && sudo bash deploy/aws/instalar.sh
+```
+
+El script carga la base en RDS (conexión SSL verificada), instala la API como servicio, publica la página con nginx en el puerto 80 y deja el bot del hotel funcionando con Node-RED (conversación, resumen de las 8:00 y avisos).
 
 ## 5. Ejecución local y demostración
 

@@ -82,7 +82,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION fn_bot_menu(p_nombre TEXT) RETURNS TEXT AS $$
-  SELECT CONCAT('¡Hola', COALESCE(', ' || INITCAP(NULLIF(TRIM(p_nombre), '')), ''), '! 👋 Soy el asistente de ',
+  -- Saludo general: no se usa el nombre de Telegram (puede ser un apodo)
+  SELECT CONCAT('¡Hola! 👋 Soy el asistente de ',
     COALESCE((SELECT STRING_AGG(nombre, ' y ') FROM hoteles WHERE activo), 'el hotel'), '.', E'\n\n',
     'Escribe el número de lo que necesitas:', E'\n',
     '1️⃣ Ver habitaciones y precios', E'\n',
