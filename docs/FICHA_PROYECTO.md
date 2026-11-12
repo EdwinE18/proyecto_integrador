@@ -13,7 +13,7 @@ Sistema de administración hotelera (PMS) para reservaciones, registro de huésp
 Los hoteles boutique y posadas familiares en Tuxtla y San Cristóbal operan con agendas manuales, causando sobreventas de habitaciones.
 
 ### 3. Tecnología de implementación
-Frontend en **React (Vite)** con arquitectura basada en componentes; backend en **Node.js (Express)** con arquitectura hexagonal; base de datos **PostgreSQL**; automatización con **n8n**, **Node-RED** y **Telegram Bot**. Despliegue en **AWS (EC2 con nginx y RDS PostgreSQL)**; desarrollo en **Ubuntu (WSL)**.
+Frontend en **React (Vite)** con arquitectura basada en componentes; backend en **Node.js (Express)** con arquitectura hexagonal; base de datos **PostgreSQL**; automatización con **n8n**, **Node-RED** y **Telegram Bot**. Despliegue en **AWS** en dos instancias **EC2**: una para el frontend (nginx) y otra para el backend con la base de datos PostgreSQL; desarrollo en **Ubuntu (WSL)**.
 
 ### 4. Problema específico
 En los hoteles boutique y posadas familiares de Tuxtla Gutiérrez y San Cristóbal de las Casas, las reservaciones se anotan en agendas de papel o en mensajes de WhatsApp, sin una fuente única que muestre qué habitaciones están ocupadas en cada fecha. Cuando dos personas del personal reciben solicitudes al mismo tiempo, o un huésped cambia sus fechas, la misma habitación se vende dos veces (**sobreventa**). Esto obliga a reubicar o rechazar huéspedes a su llegada y daña la reputación del establecimiento. El registro manual también provoca otros problemas: no se sabe con certeza cuánto debe cada huésped, se pierde el historial de anticipos, el personal de limpieza no se entera a tiempo de qué cuartos se liberaron y los precios de temporada alta se calculan a mano, con errores.

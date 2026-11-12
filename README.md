@@ -275,17 +275,6 @@ psql -h localhost -U pms_admin -d hotel_pms -f database/11_consultas_evaluacion.
 
 La configuración paso a paso está en **[automation/README.md](automation/README.md)**.
 
-## 6. Despliegue en AWS
-
-Guía paso a paso para AWS Academy Learner Lab en [`deploy/aws/README.md`](deploy/aws/README.md). En resumen: se crean un EC2 (Ubuntu 24.04) y una base RDS PostgreSQL 16 desde la consola, y en el EC2 se corre una sola vez:
-
-```bash
-sudo git clone https://github.com/EdwinE18/proyecto_integrador.git /opt/hotel-pms
-cd /opt/hotel-pms && sudo bash deploy/aws/instalar.sh
-```
-
-El script carga la base en RDS (conexión SSL verificada), instala la API como servicio, publica la página con nginx en el puerto 80 y deja el bot del hotel funcionando con Node-RED (conversación, resumen de las 8:00 y avisos).
-
 ## 5. Ejecución local y demostración
 
 El sistema se entrega para correr en una computadora con Ubuntu (o Windows con WSL). Se abren **dos terminales**:
@@ -310,3 +299,21 @@ cloudflared tunnel --url http://localhost:5173
 ```
 
 El enlace cambia cada vez que se ejecuta el comando y deja de funcionar al cerrarlo.
+
+## 6. Despliegue en AWS
+
+Guía paso a paso para AWS Academy Learner Lab en [`deploy/aws/README.md`](deploy/aws/README.md). Se usan **dos servidores EC2** (Ubuntu 24.04):
+
+| Servidor | Contiene | Abierto a |
+|---|---|---|
+| `hotel-pms-front` | nginx con la página React; reenvía `/api` al backend por la red privada | Internet, puerto 80 |
+| `hotel-pms-back` | API Node.js (`pms-api`), PostgreSQL 16 y el bot del hotel con Node-RED (`pms-bot`) | Solo el frontend, puerto 3000 |
+
+En cada servidor se corre una sola vez el mismo script, que pregunta cuál es:
+
+```bash
+sudo git clone https://github.com/EdwinE18/proyecto_integrador.git /opt/hotel-pms
+cd /opt/hotel-pms && sudo bash deploy/aws/instalar.sh
+```
+
+También admite todo en un solo servidor, o la base de datos en RDS.

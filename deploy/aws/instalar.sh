@@ -4,12 +4,14 @@
 #
 #     sudo bash deploy/aws/instalar.sh
 #
-#  Pregunta lo necesario y deja funcionando, con arranque automático:
-#    · Base de datos: en AWS RDS PostgreSQL, o PostgreSQL en este mismo servidor
-#    · API (Node.js) como servicio "pms-api"
-#    · Página web con nginx en el puerto 80
-#    · Bot del hotel con Node-RED (servicio "pms-bot"): conversación con huéspedes,
-#      resumen de las 8:00 y avisos por Telegram
+#  Sirve para dos servidores (o uno solo con todo). Primero pregunta cuál es este:
+#    1) BACKEND + BASE DE DATOS: PostgreSQL (aquí mismo, o AWS RDS), la API (Node.js,
+#       servicio "pms-api", puerto 3000) y el bot del hotel con Node-RED (servicio "pms-bot":
+#       conversación con huéspedes, resumen de las 8:00 y avisos por Telegram)
+#    2) FRONTEND: la página web (React compilado) con nginx en el puerto 80;
+#       nginx reenvía /api al backend por la red privada de AWS
+#    3) TODO EN UNO: las dos cosas en el mismo servidor
+#  Todo queda con arranque automático.
 #
 #  Se puede volver a correr: no borra datos. Para solo actualizar el código: actualizar.sh
 #  Todas las respuestas se pueden dar por variables de entorno (ver PREGUNTAS abajo).
@@ -45,21 +47,35 @@ pregunta() {  # pregunta VARIABLE "texto" [valor_por_omision] [secreta]
 
 # ---------------------------------------------------------------------
 paso "PREGUNTAS"
-echo "  ¿Dónde va la base de datos?"
-echo "    1) AWS RDS PostgreSQL (ya creada en la consola)"
-echo "    2) PostgreSQL en este mismo servidor"
-pregunta MODO_BD "Elige 1 o 2" "1"
-if [[ "$MODO_BD" == "1" ]]; then
-  pregunta RDS_HOST "Endpoint de RDS (ej. hotel-pms-db.xxxx.us-east-1.rds.amazonaws.com)"
-  pregunta RDS_ADMIN "Usuario maestro de RDS" "postgres"
-  pregunta RDS_ADMIN_PASS "Contraseña maestra de RDS" "" secreta
-  DB_HOST=$RDS_HOST; DB_SSL=true
-else
-  DB_HOST=127.0.0.1; DB_SSL=false
+echo "  ¿Qué servidor es este?"
+echo "    1) Backend + base de datos (API, PostgreSQL y bot)"
+echo "    2) Frontend (página web con nginx)"
+echo "    3) Todo en uno (un solo servidor)"
+pregunta ROL "Elige 1, 2 o 3" "1"
+[[ "$ROL" =~ ^[123]$ ]] || { echo "Opción inválida: $ROL"; exit 1; }
+es_back()  { [[ "$ROL" == 1 || "$ROL" == 3 ]]; }
+es_front() { [[ "$ROL" == 2 || "$ROL" == 3 ]]; }
+
+DB_HOST=127.0.0.1; DB_SSL=false
+if es_back; then
+  echo "  ¿Dónde va la base de datos?"
+  echo "    1) AWS RDS PostgreSQL (ya creada en la consola)"
+  echo "    2) PostgreSQL en este mismo servidor"
+  pregunta MODO_BD "Elige 1 o 2" "2"
+  if [[ "$MODO_BD" == "1" ]]; then
+    pregunta RDS_HOST "Endpoint de RDS (ej. hotel-pms-db.xxxx.us-east-1.rds.amazonaws.com)"
+    pregunta RDS_ADMIN "Usuario maestro de RDS" "postgres"
+    pregunta RDS_ADMIN_PASS "Contraseña maestra de RDS" "" secreta
+    DB_HOST=$RDS_HOST; DB_SSL=true
+  fi
+  pregunta CARGAR_DEMO "¿Cargar datos de demostración (Posada Los Arcos)? s/n" "s"
 fi
-pregunta CARGAR_DEMO "¿Cargar datos de demostración (Posada Los Arcos)? s/n" "s"
+MODO_BD=${MODO_BD:-2}
+if [[ "$ROL" == 2 ]]; then
+  pregunta BACKEND_IP "IP PRIVADA del servidor backend (en EC2: Private IPv4, ej. 172.31.20.15)"
+fi
 pregunta BOT_USUARIO "Usuario del bot del hotel, sin @ (vacío = sin bot)" ""
-if [[ -n "$BOT_USUARIO" ]]; then pregunta BOT_TOKEN "Token del bot (de @BotFather)" "" secreta; fi
+if es_back && [[ -n "$BOT_USUARIO" ]]; then pregunta BOT_TOKEN "Token del bot (de @BotFather)" "" secreta; fi
 
 # Secretos propios del sistema: se generan una vez y se reutilizan
 DB_PASS=${DB_PASS:-$(openssl rand -hex 12)}
@@ -69,6 +85,8 @@ JWT_SECRET=${JWT_SECRET:-$(openssl rand -hex 32)}
 (umask 077
 cat > "$SECRETOS" <<TXT
 # Datos de la instalación del PMS (no compartir). Se reutilizan si vuelves a correr instalar.sh
+ROL=$ROL
+BACKEND_IP=${BACKEND_IP:-}
 MODO_BD=$MODO_BD
 RDS_HOST=${RDS_HOST:-}
 RDS_ADMIN=${RDS_ADMIN:-}
@@ -76,7 +94,7 @@ DB_PASS=$DB_PASS
 ASIS_PASS=$ASIS_PASS
 JWT_SECRET=$JWT_SECRET
 BOT_USUARIO=$BOT_USUARIO
-CARGAR_DEMO=$CARGAR_DEMO
+CARGAR_DEMO=${CARGAR_DEMO:-s}
 TXT
 )
 
@@ -84,18 +102,22 @@ TXT
 paso "1/7 Paquetes del sistema"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl ca-certificates git nginx python3 build-essential postgresql-client openssl >/dev/null
+PAQUETES=(curl ca-certificates git python3 openssl)
+es_back  && PAQUETES+=(build-essential postgresql-client)
+es_front && PAQUETES+=(nginx)
+apt-get install -y -qq "${PAQUETES[@]}" >/dev/null
 if ! command -v node >/dev/null || [[ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null
   apt-get install -y -qq nodejs >/dev/null
 fi
-ok "Node.js $(node -v), nginx, cliente de PostgreSQL"
+ok "Node.js $(node -v) y ${PAQUETES[*]}"
 if command -v timedatectl >/dev/null && timedatectl set-timezone America/Mexico_City 2>/dev/null; then
   ok "Zona horaria del servidor: America/Mexico_City"
 fi
 id "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$APP_USER"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+if es_back; then
 # ---------------------------------------------------------------------
 paso "2/7 Base de datos"
 if [[ "$MODO_BD" == "1" ]]; then
@@ -195,7 +217,9 @@ RestartSec=3
 WantedBy=multi-user.target
 UNIT
 ok "Servicio pms-api"
+fi   # fin de la parte del backend (pasos 2 y 3)
 
+if es_front; then
 # ---------------------------------------------------------------------
 paso "4/7 Página web (frontend)"
 echo "VITE_TELEGRAM_BOT=$BOT_USUARIO" > "$APP_DIR/frontend/.env"
@@ -206,13 +230,21 @@ ok "Compilada y copiada a $WEB_DIR"
 
 # ---------------------------------------------------------------------
 paso "5/7 nginx (puerto 80)"
-cp "$APP_DIR/deploy/aws/nginx-pms.conf" /etc/nginx/sites-available/hotel-pms
+# En el servidor de frontend, /api se reenvía a la IP privada del backend
+API_DESTINO=$([[ "$ROL" == 2 ]] && echo "$BACKEND_IP" || echo 127.0.0.1)
+sed "s#http://127.0.0.1:3000#http://$API_DESTINO:3000#" "$APP_DIR/deploy/aws/nginx-pms.conf" > /etc/nginx/sites-available/hotel-pms
 ln -sf /etc/nginx/sites-available/hotel-pms /etc/nginx/sites-enabled/hotel-pms
 rm -f /etc/nginx/sites-enabled/default
 nginx -t -q
-ok "nginx: la web en /, la API en /api"
+ok "nginx: la web en /, la API en /api → $API_DESTINO:3000"
+if [[ "$ROL" == 2 ]]; then
+  if curl -s -m 5 "http://$BACKEND_IP:3000/api/health" | grep -q '"ok":true'; then ok "El backend responde en $BACKEND_IP:3000"
+  else aviso "No pude llegar al backend en $BACKEND_IP:3000. Revisa que esté instalado y que su grupo de seguridad permita el puerto 3000 desde este servidor."; fi
+fi
+fi   # fin de la parte del frontend (pasos 4 y 5)
 
 # ---------------------------------------------------------------------
+if es_back; then
 paso "6/7 Bot del hotel (Node-RED)"
 if [[ -n "$BOT_USUARIO" && -n "${BOT_TOKEN:-}" ]]; then
   command -v node-red >/dev/null || npm install -g --unsafe-perm --no-audit --no-fund --loglevel=error node-red >/dev/null
@@ -259,27 +291,41 @@ UNIT
 else
   aviso "Sin bot: vuelve a correr este script cuando tengas el token de @BotFather"
 fi
+fi   # fin del bot (paso 6)
 
 # ---------------------------------------------------------------------
 paso "7/7 Arrancar servicios"
 if command -v systemctl >/dev/null && [[ -d /run/systemd/system ]]; then
   systemctl daemon-reload
-  systemctl enable --now pms-api >/dev/null 2>&1; systemctl restart pms-api
-  [[ -f /etc/systemd/system/pms-bot.service ]] && { systemctl enable --now pms-bot >/dev/null 2>&1; systemctl restart pms-bot; }
-  systemctl enable nginx >/dev/null 2>&1; systemctl reload-or-restart nginx
+  if es_back; then
+    systemctl enable --now pms-api >/dev/null 2>&1; systemctl restart pms-api
+    [[ -f /etc/systemd/system/pms-bot.service ]] && { systemctl enable --now pms-bot >/dev/null 2>&1; systemctl restart pms-bot; }
+  fi
+  if es_front; then systemctl enable nginx >/dev/null 2>&1; systemctl reload-or-restart nginx; fi
   sleep 3
-  systemctl is-active --quiet pms-api && ok "API funcionando" || aviso "La API no arrancó: journalctl -u pms-api -n 50"
-  [[ -f /etc/systemd/system/pms-bot.service ]] && { systemctl is-active --quiet pms-bot && ok "Bot funcionando" || aviso "El bot no arrancó: journalctl -u pms-bot -n 50"; }
+  if es_back; then
+    if systemctl is-active --quiet pms-api; then ok "API funcionando"; else aviso "La API no arrancó: journalctl -u pms-api -n 50"; fi
+    if [[ -f /etc/systemd/system/pms-bot.service ]]; then
+      if systemctl is-active --quiet pms-bot; then ok "Bot funcionando"; else aviso "El bot no arrancó: journalctl -u pms-bot -n 50"; fi
+    fi
+  fi
 else
-  aviso "Este equipo no usa systemd: arranca a mano  node $APP_DIR/backend/src/server.js  y  nginx"
+  aviso "Este equipo no usa systemd: arranca a mano $(es_back && echo "node $APP_DIR/backend/src/server.js") $(es_front && echo nginx)"
 fi
 
 # IP pública (servicio de metadatos de EC2)
 TOKEN_MD=$(curl -s -m 2 -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
 IP=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN_MD" http://169.254.169.254/latest/meta-data/public-ipv4 || true)
+IP_PRIV=$(curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOKEN_MD" http://169.254.169.254/latest/meta-data/local-ipv4 || true)
 echo
-echo -e "\033[1;32m✅ PMS instalado.\033[0m"
-echo "   Abre:  http://${IP:-<IP-pública-del-servidor>}"
-echo "   Usuarios de prueba (contraseña Demo1234): admin@pms.local · gerente@losarcos.mx · recepcion@losarcos.mx · limpieza@losarcos.mx"
+if [[ "$ROL" == 1 ]]; then
+  echo -e "\033[1;32m✅ Backend + base de datos instalados.\033[0m"
+  echo "   IP PRIVADA de este servidor:  ${IP_PRIV:-<ver Private IPv4 en la consola de EC2>}"
+  echo "   Úsala al instalar el servidor de FRONTEND (opción 2)."
+  echo "   Ver registros:  journalctl -u pms-api -f   ·   journalctl -u pms-bot -f"
+else
+  echo -e "\033[1;32m✅ PMS instalado.\033[0m"
+  echo "   Abre:  http://${IP:-<IP-pública-del-servidor>}"
+  echo "   Usuarios de prueba (contraseña Demo1234): admin@pms.local · gerente@losarcos.mx · recepcion@losarcos.mx · limpieza@losarcos.mx"
+fi
 echo "   Contraseñas generadas guardadas en $SECRETOS (solo root)"
-echo "   Ver registros:  journalctl -u pms-api -f   ·   journalctl -u pms-bot -f"
